@@ -1,5 +1,6 @@
 /__pycache__
-alphaBoomer001.session
+*.session
+*.session-journal
 settings.ini
 *.log
 *.db

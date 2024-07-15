@@ -59,17 +59,19 @@ bot_token = config["General"]["Token"]
 api_id = int(config["General"]["ApiID"])
 api_hash = config["General"]["ApiHash"]
 
-support_chats = config["OnlySupportChats"]
+support_chats = config["MainInformation.allPrograms.OnlySupportChats"]
 support_users = list(config["SupportUsers"].values())
 
-channel_chats = config["OnlyChannelChats"]
+channel_chats = config["MainInformation.allPrograms.OnlyChannelChats"]
 channel_links = config["OnlyChannelLinks"]
 
 moderators = config["Moderators"]
 
 all_program_keys = InlineKeyboardBuilder()
 
-client = TelegramClient(config["General"]["alphaBoomer001"], api_id, api_hash)
+inline_keyboards_arr = []
+
+client = TelegramClient(config["General"]["SessionTelethonName"], api_id, api_hash)
 client.start()
 
 bot = Bot(token=bot_token)
@@ -79,10 +81,27 @@ dp = Dispatcher()
 async def set_menu(bot: Bot) -> None:
     main_menu_commands = [
         BotCommand(command="/all_programs", description="Все программы"),
+        BotCommand(command="/diag_equipment", description="Диагностическое оборудование"),
+        BotCommand(command="/order_parts", description="Заказ запчастей"),
         BotCommand(command="/support", description="Написать запрос в поддержку")
     ]
 
     await bot.set_my_commands(main_menu_commands)
+
+
+# @dp.message(Command("test_photo"))
+# async def test_photo(message: types.Message) -> None:
+#     path_to_photo = "C:\\Users\\Yura\\Desktop\\bot_photos\\icom.jpg"
+    
+#     await message.answer_photo(
+#         types.FSInputFile(path=path_to_photo), caption="Some kind of caption"
+#     )
+
+#     # await message.answer(
+#     #     msg,
+#     #     reply_markup=all_program_keys.as_markup()
+#     # )
+
 
 
 @dp.message(Command("all_programs"))
@@ -340,9 +359,92 @@ def add_button_keys(add_chats: dict[str, str], callback_type: str, chat_type: st
             i += 1
 
 
+def add_button_key(builder: InlineKeyboardBuilder,
+                       chats: dict[str, str],
+                       callback_type: str, 
+                       chat_type: str, 
+                       max_len: int, 
+                       width: int) -> None:
+    chat_keys = list(chats.keys())
+    keys_arr = []
+
+    i = 0
+    w = 0
+    while i < len(chat_keys):
+        if len(chats[chat_keys[i]]) < max_len and w < width:
+            keys_arr.append(
+                types.InlineKeyboardButton(
+                text=chats[chat_keys[i]],
+                callback_data=ChatType(
+                    key=chat_keys[i], 
+                    con_type=callback_type,
+                    chat_type=chat_type).pack()
+                )
+            )
+            w += 1
+            i += 1
+        elif len(chats[chat_keys[i]]) > max_len:
+            keys_arr.append(
+                types.InlineKeyboardButton(
+                text=chats[chat_keys[i]],
+                callback_data=ChatType(
+                    key=chat_keys[i], 
+                    con_type=callback_type,
+                    chat_type=chat_type).pack()
+                )
+            )
+            i += 1
+            w = width
+        
+        if w == width:
+            builder.row(*keys_arr, width=width)
+            w = 0
+            keys_arr = []
+
+
+
 async def main() -> None:
-    add_button_keys(channel_chats, "OnlyChannelChats", "Channel", 20)
-    add_button_keys(support_chats, "OnlySupportChats", "Support", 20)
+    # arr = [
+    #     types.InlineKeyboardButton(
+    #         text="text 1",
+    #         callback_data="Text1"
+    #         ),
+    #     types.InlineKeyboardButton(
+    #         text="text 2",
+    #         callback_data="Text12"
+    #         ),
+    #     types.InlineKeyboardButton(
+    #         text="text 3",
+    #         callback_data="Text13"
+    #         ),
+    # ]
+
+    new_add_button_key(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 20, 3)
+
+    # all_program_keys.row(arr[1])
+    # all_program_keys.row(*arr, width=3)
+    
+    # chanel_chat_builder = InlineKeyboardBuilder()
+    # chanel_chat_builder.row(
+    #     types.InlineKeyboardButton(
+    #             text=channel_chats["chat1"],
+    #             callback_data=ChatType(key="chat1", 
+    #                                    con_type=callback_type,
+    #                                    chat_type=chat_type).pack()
+    #             )
+    #         )
+    # )
+    #channel_chats
+
+
+    # inline_keyboards_arr.append(chanel_chat_builder)
+
+    # for i in range(len(config["MainInformation"] - 1)):
+    #     key_builder = InlineKeyboardBuilder()
+
+    #     inline_keyboards_arr.append(key_builder)
+    # # add_button_keys(channel_chats, "OnlyChannelChats", "Channel", 20)
+    # add_button_keys(support_chats, "OnlySupportChats", "Support", 20)
 
     dp.startup.register(set_menu)
     await dp.start_polling(bot)
