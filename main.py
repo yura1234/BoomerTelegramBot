@@ -65,6 +65,9 @@ support_users = list(config["SupportUsers"].values())
 channel_chats = config["MainInformation.allPrograms.OnlyChannelChats"]
 channel_links = config["OnlyChannelLinks"]
 
+key_chan_list = list(channel_chats.keys())
+val_chan_list = list(channel_chats.values())
+
 moderators = config["Moderators"]
 
 all_program_keys = InlineKeyboardBuilder()
@@ -106,10 +109,8 @@ async def set_menu(bot: Bot) -> None:
 
 @dp.message(Command("all_programs"))
 async def all_programs(message: types.Message) -> None:
-    msg = "Доступные услуги по направлениям BMW / Mini / Motorrad / Rolls-Royce"
-
     await message.answer(
-        msg,
+        "Выберете необходимую программу или услугу",
         reply_markup=all_program_keys.as_markup()
     )
 
@@ -134,7 +135,6 @@ async def diag_equip_prog(message: types.Message) -> None:
     logging.info(f"User {message.from_user.username} get chat link - {link}")
 
 
-# @dp.callback_query(F.data == "OnlySupportChats")
 @dp.callback_query(ChatType.filter(F.con_type == "OnlySupportChats"))
 async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -> None:
     msg = "Для получения более подробной информаци по продукту " +\
@@ -280,14 +280,16 @@ async def save_sto(message: types.Message, state: FSMContext) -> None:
     ))
     moderator_id = find_user.full_user.id
 
+    position = val_chan_list.index(product)
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(
             text="Предоставить ссылку",
-            callback_data=AccesData(user_id=message.from_user.id, product=product, permission=True).pack()),
+            callback_data=AccesData(user_id=message.from_user.id, product=key_chan_list[position], permission=True).pack()),
         types.InlineKeyboardButton(
             text="НЕ предоставлять ссылку",
-            callback_data=AccesData(user_id=message.from_user.id, product=product, permission=False).pack()),
+            callback_data=AccesData(user_id=message.from_user.id, product=key_chan_list[position], permission=False).pack()),
         )
     
     await message.answer("Ожидайте ответа модератора.") 
@@ -301,7 +303,7 @@ async def save_sto(message: types.Message, state: FSMContext) -> None:
 
 @dp.callback_query(AccesData.filter(F.permission == True))
 async def grant_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
-    msg = f"Ссылка для подключения к чату по программе {callback_data.product}\n" +\
+    msg = f"Ссылка для подключения к чату по программе {channel_chats[callback_data.product]}\n" +\
         f"{channel_links[callback_data.product]}"
     
     await callback.message.answer("Принят")
@@ -314,7 +316,7 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesData) ->
 
 @dp.callback_query(AccesData.filter(F.permission == False))
 async def decline_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
-    msg = f"Ваш запрос для подключения к чату по программе {callback_data.product}\n отклонен!"
+    msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]}\n отклонен!"
     
     await callback.message.answer("Отклонен")
 
@@ -324,47 +326,14 @@ async def decline_permission(callback: CallbackQuery, callback_data: AccesData) 
         )
 
 
-def add_button_keys(add_chats: dict[str, str], callback_type: str, chat_type: str, max_len: int) -> None:
-    sup_keys = list(add_chats.keys())
-
-    i = 0
-    while i < len(sup_keys):
-        if len(add_chats[sup_keys[i]]) <= max_len and len(add_chats[sup_keys[i + 1]]) <= max_len:
-            all_program_keys.row(
-            types.InlineKeyboardButton(
-                text=add_chats[sup_keys[i]],
-                callback_data=ChatType(
-                    key=sup_keys[i], 
-                    con_type=callback_type,
-                    chat_type=chat_type).pack()
-                ),
-            types.InlineKeyboardButton(
-                text=add_chats[sup_keys[i + 1]],
-                callback_data=ChatType(
-                    key=sup_keys[i + 1], 
-                    con_type=callback_type,
-                    chat_type=chat_type).pack()
-                )
-            )
-            i += 2
-        else:
-            all_program_keys.row(
-            types.InlineKeyboardButton(
-                text=add_chats[sup_keys[i]],
-                callback_data=ChatType(key=sup_keys[i], 
-                                       con_type=callback_type,
-                                       chat_type=chat_type).pack()
-                )
-            )
-            i += 1
-
-
-def add_button_key(builder: InlineKeyboardBuilder,
-                       chats: dict[str, str],
-                       callback_type: str, 
-                       chat_type: str, 
-                       max_len: int, 
-                       width: int) -> None:
+def add_button_keys(
+        builder: InlineKeyboardBuilder,
+        chats: dict[str, str],
+        callback_type: str, 
+        chat_type: str, 
+        max_len: int, 
+        width: int
+) -> None:
     chat_keys = list(chats.keys())
     keys_arr = []
 
@@ -384,6 +353,10 @@ def add_button_key(builder: InlineKeyboardBuilder,
             w += 1
             i += 1
         elif len(chats[chat_keys[i]]) > max_len:
+            if len(keys_arr) > 0:
+                builder.row(*keys_arr, width=width)
+                keys_arr = []
+
             keys_arr.append(
                 types.InlineKeyboardButton(
                 text=chats[chat_keys[i]],
@@ -402,49 +375,9 @@ def add_button_key(builder: InlineKeyboardBuilder,
             keys_arr = []
 
 
-
 async def main() -> None:
-    # arr = [
-    #     types.InlineKeyboardButton(
-    #         text="text 1",
-    #         callback_data="Text1"
-    #         ),
-    #     types.InlineKeyboardButton(
-    #         text="text 2",
-    #         callback_data="Text12"
-    #         ),
-    #     types.InlineKeyboardButton(
-    #         text="text 3",
-    #         callback_data="Text13"
-    #         ),
-    # ]
-
-    new_add_button_key(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 20, 3)
-
-    # all_program_keys.row(arr[1])
-    # all_program_keys.row(*arr, width=3)
-    
-    # chanel_chat_builder = InlineKeyboardBuilder()
-    # chanel_chat_builder.row(
-    #     types.InlineKeyboardButton(
-    #             text=channel_chats["chat1"],
-    #             callback_data=ChatType(key="chat1", 
-    #                                    con_type=callback_type,
-    #                                    chat_type=chat_type).pack()
-    #             )
-    #         )
-    # )
-    #channel_chats
-
-
-    # inline_keyboards_arr.append(chanel_chat_builder)
-
-    # for i in range(len(config["MainInformation"] - 1)):
-    #     key_builder = InlineKeyboardBuilder()
-
-    #     inline_keyboards_arr.append(key_builder)
-    # # add_button_keys(channel_chats, "OnlyChannelChats", "Channel", 20)
-    # add_button_keys(support_chats, "OnlySupportChats", "Support", 20)
+    add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 20, 3)
+    add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 15, 2)
 
     dp.startup.register(set_menu)
     await dp.start_polling(bot)
