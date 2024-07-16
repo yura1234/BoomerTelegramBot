@@ -65,12 +65,15 @@ support_users = list(config["SupportUsers"].values())
 channel_chats = config["MainInformation.allPrograms.OnlyChannelChats"]
 channel_links = config["OnlyChannelLinks"]
 
+order_chats = config["MainInformation.orderParts"]
+
 key_chan_list = list(channel_chats.keys())
 val_chan_list = list(channel_chats.values())
 
 moderators = config["Moderators"]
 
 all_program_keys = InlineKeyboardBuilder()
+order_parts_keys = InlineKeyboardBuilder()
 
 inline_keyboards_arr = []
 
@@ -115,8 +118,16 @@ async def all_programs(message: types.Message) -> None:
     )
 
 
+@dp.message(Command("order_parts"))
+async def order_parts(message: types.Message) -> None:
+    await message.answer(
+        "Выберете необходимую программу или услугу",
+        reply_markup=order_parts_keys.as_markup()
+    )
+
+
 @dp.message(Command("support"))
-async def diag_equip_prog(message: types.Message) -> None:
+async def support_chat(message: types.Message) -> None:
     msg = "Для получения более подробной информаци " +\
         f"или услуге Вы можете отправить сообщение на " +\
         "запрос в чате ниже или на почту support@bimmer-online.com"
@@ -126,7 +137,7 @@ async def diag_equip_prog(message: types.Message) -> None:
 
     chat_name = f"{message.from_user.username} запрос поддержки"
 
-    link = await create_chat(users, chat_name, "diag_equip")
+    link = await create_chat(users, chat_name, "support_chat")
 
     msg = f"По вашему запросу поддержки был создан чат, ссылка на чат {link}"
     await message.answer(
@@ -137,8 +148,13 @@ async def diag_equip_prog(message: types.Message) -> None:
 
 @dp.callback_query(ChatType.filter(F.con_type == "OnlySupportChats"))
 async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -> None:
+    if callback_data.chat_type == "OrderParts":
+        chat = order_chats
+    else:
+        chat = support_chats
+
     msg = "Для получения более подробной информаци по продукту " +\
-    f"\"{support_chats[callback_data.key]}\" или услуге Вы можете отправить сообщение на " +\
+    f"\"{chat[callback_data.key]}\" или услуге Вы можете отправить сообщение на " +\
     "запрос в чате ниже или на почту support@bimmer-online.com"
     builder = InlineKeyboardBuilder()
     callback_data.con_type = "CreateChat"
@@ -148,6 +164,12 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
             text="Создать чат с поддержкой",
             callback_data=callback_data.pack())
         )
+    
+    if callback_data.chat_type == "OrderParts" and callback_data.key == "chat3":
+        msg = "Уважаемые клиенты, перед отправкой запроса на поиск детали просьба ознакомиться с правилами заказа:" +\
+        "1) Сроки поставки составляют от 2-х месяцев" +\
+        "2) Вес одной детали не более 30 кг" +\
+        "3) Максимальные габаритные размеры упаковки не должны превышать 180x60x60 см"
 
     await callback.message.answer(
         msg,
@@ -197,8 +219,10 @@ async def create_chat(users: list, chat_name: str, contract_type: str) -> str:
 async def create_support_chats(callback: CallbackQuery, callback_data: ChatType) -> None:
     if callback_data.chat_type == "Support":
         chat = support_chats
-    else:
+    elif callback_data.chat_type == "Channel":
         chat = channel_chats
+    else:
+        chat = order_chats
 
     users = support_users.copy()
     users.append(callback.from_user.username)
@@ -316,7 +340,7 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesData) ->
 
 @dp.callback_query(AccesData.filter(F.permission == False))
 async def decline_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
-    msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]}\n отклонен!"
+    msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]} отклонен!"
     
     await callback.message.answer("Отклонен")
 
@@ -378,6 +402,7 @@ def add_button_keys(
 async def main() -> None:
     add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 20, 3)
     add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 15, 2)
+    add_button_keys(order_parts_keys, order_chats, "OnlySupportChats", "OrderParts", 15, 2)
 
     dp.startup.register(set_menu)
     await dp.start_polling(bot)
