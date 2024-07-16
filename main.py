@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import os
 from database import *
 
 from configparser import ConfigParser
@@ -14,6 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.utils.media_group import MediaGroupBuilder
 
 from telethon.sync import TelegramClient
 from telethon import functions
@@ -67,6 +69,11 @@ channel_links = config["OnlyChannelLinks"]
 
 order_chats = config["MainInformation.orderParts"]
 
+diag_equip_chats = config["MainInformation.diagEquipment"]
+equip_photos = config["MainInformation.diagEquipment.PhotoPath"]
+
+path_photos = os.getcwd() + "\\photos\\"
+
 key_chan_list = list(channel_chats.keys())
 val_chan_list = list(channel_chats.values())
 
@@ -74,6 +81,10 @@ moderators = config["Moderators"]
 
 all_program_keys = InlineKeyboardBuilder()
 order_parts_keys = InlineKeyboardBuilder()
+diag_equip_keys = InlineKeyboardBuilder()
+
+equip_dict = dict(diag_equip_chats)
+equip_dict.popitem()
 
 inline_keyboards_arr = []
 
@@ -95,19 +106,26 @@ async def set_menu(bot: Bot) -> None:
     await bot.set_my_commands(main_menu_commands)
 
 
-# @dp.message(Command("test_photo"))
-# async def test_photo(message: types.Message) -> None:
-#     path_to_photo = "C:\\Users\\Yura\\Desktop\\bot_photos\\icom.jpg"
-    
-#     await message.answer_photo(
-#         types.FSInputFile(path=path_to_photo), caption="Some kind of caption"
-#     )
+@dp.message(Command("diag_equipment"))
+async def diag_equipment(message: types.Message) -> None:
+    group_photos = MediaGroupBuilder()
 
-#     # await message.answer(
-#     #     msg,
-#     #     reply_markup=all_program_keys.as_markup()
-#     # )
+    for key,val in equip_dict.items():
+        # await message.answer_photo(
+        #     types.FSInputFile(path=path_photos + equip_photos[key]), caption=val
+        # )
+        # if key != "chat5":
+        group_photos.add(type="photo", media=types.FSInputFile(path=path_photos + equip_photos[key]), caption=val)
 
+    await bot.send_media_group(
+        chat_id=message.from_user.id,
+        media=group_photos.build()
+    )
+
+    await message.answer(
+        "Выберете необходимое оборудование для покупки",
+        reply_markup=diag_equip_keys.as_markup()
+    )
 
 
 @dp.message(Command("all_programs"))
@@ -150,8 +168,10 @@ async def support_chat(message: types.Message) -> None:
 async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -> None:
     if callback_data.chat_type == "OrderParts":
         chat = order_chats
-    else:
+    elif callback_data.chat_type == "Support":
         chat = support_chats
+    elif callback_data.chat_type == "DiagEquip":
+        chat = diag_equip_chats
 
     msg = "Для получения более подробной информаци по продукту " +\
     f"\"{chat[callback_data.key]}\" или услуге Вы можете отправить сообщение на " +\
@@ -170,7 +190,10 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
         "1) Сроки поставки составляют от 2-х месяцев" +\
         "2) Вес одной детали не более 30 кг" +\
         "3) Максимальные габаритные размеры упаковки не должны превышать 180x60x60 см"
+    elif callback_data.chat_type == "OrderParts" and (callback_data.key == "chat1" or callback_data.key == "chat2"):
+        msg = "Напишите в чат Ваш запрос с указанием артикула детали и VIN номера автомобиля"
 
+    
     await callback.message.answer(
         msg,
         reply_markup=builder.as_markup()
@@ -221,13 +244,18 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatType)
         chat = support_chats
     elif callback_data.chat_type == "Channel":
         chat = channel_chats
-    else:
+    elif callback_data.chat_type == "OrderParts":
         chat = order_chats
+    else:
+        chat = diag_equip_chats
 
     users = support_users.copy()
     users.append(callback.from_user.username)
 
     chat_name = f"{callback.from_user.username} продукт {chat[callback_data.key]}"
+
+    if callback_data.chat_type == "DiagEquip" and callback_data.key == "chat5":
+        chat_name = f"{callback.from_user.username} запрос на оборудование"
 
     link = await create_chat(users, chat_name, chat[callback_data.key])
 
@@ -240,8 +268,8 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatType)
 
 @dp.callback_query(ChatType.filter(F.con_type == "OnlyChannelChats"))
 async def only_channel_chats(callback: CallbackQuery, callback_data: ChatType, state: FSMContext) -> None:
-    msg = f"Для доступа в канал {channel_chats[callback_data.key]} необходимо указать email/название СТО\n" +\
-        "или можете написать запрос в поддержку."
+    msg = f"Для доступа в канал {channel_chats[callback_data.key]} необходимо указать Ваш рабочий email и название СТО.\n" +\
+        "Либо направьте запрос в поддержку."
     callback_data.con_type = "CreateChat"
 
     builder = InlineKeyboardBuilder()
@@ -257,7 +285,7 @@ async def only_channel_chats(callback: CallbackQuery, callback_data: ChatType, s
     )
 
     await callback.message.answer(
-        "Сначала укажите email"
+        "Укажите Ваш email:"
     )
 
     await state.update_data(username=callback.from_user.username)
@@ -276,7 +304,7 @@ async def save_email(message: types.Message, state: FSMContext) -> None:
     
     await state.update_data(email=message.text)
 
-    await message.answer("Пожалуйста введите адрес СТО")
+    await message.answer("Укажите название Вашей СТО:")
     await state.set_state(UserData.sto_name)
 
 
@@ -376,7 +404,7 @@ def add_button_keys(
             )
             w += 1
             i += 1
-        elif len(chats[chat_keys[i]]) > max_len:
+        elif len(chats[chat_keys[i]]) >= max_len:
             if len(keys_arr) > 0:
                 builder.row(*keys_arr, width=width)
                 keys_arr = []
@@ -403,6 +431,7 @@ async def main() -> None:
     add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 20, 3)
     add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 15, 2)
     add_button_keys(order_parts_keys, order_chats, "OnlySupportChats", "OrderParts", 15, 2)
+    add_button_keys(diag_equip_keys, diag_equip_chats, "OnlySupportChats", "DiagEquip", 15, 2)
 
     dp.startup.register(set_menu)
     await dp.start_polling(bot)
