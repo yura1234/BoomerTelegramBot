@@ -5,3 +5,11 @@ create table created_chats(
     users_in_chat text,
     link text
 );
+
+create table acces_users(
+    user_id int,
+    product text,
+    email text,
+    sto_name text,
+    permission int
+);

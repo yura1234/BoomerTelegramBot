@@ -201,13 +201,13 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
 
 
 async def create_chat(users: list, chat_name: str, contract_type: str) -> str:
-    chat_row_from_db = await db.get_chat_link("created_chats", contract_type, users[-1])
+    chat_row_from_db = await db.get_chat_link(contract_type, users[-1])
 
     if chat_row_from_db != None:
         try:
             await client(functions.messages.CheckChatInviteRequest(hash=chat_row_from_db[4].split("/")[-1][1:]))
         except BadRequestError:
-            await db.delete_chat_link("created_chats", chat_row_from_db[0])
+            await db.delete("created_chats", chat_row_from_db[0])
             logging.info(f"Chat with id {chat_row_from_db[0]} was deleted! Сreate new chat.")
             chat_row_from_db = None
     
@@ -268,6 +268,17 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatType)
 
 @dp.callback_query(ChatType.filter(F.con_type == "OnlyChannelChats"))
 async def only_channel_chats(callback: CallbackQuery, callback_data: ChatType, state: FSMContext) -> None:
+    get_permission = await db.get_acces_user_channel(callback.from_user.id, channel_chats[callback_data.key])
+
+    if get_permission != None:
+        msg = f"Ссылка для подключения к чату по программе {channel_chats[callback_data.key]}\n" +\
+            f"{channel_links[callback_data.key]}"
+        
+        await callback.message.answer(
+            msg
+        )
+        return
+    
     msg = f"Для доступа в канал {channel_chats[callback_data.key]} необходимо указать Ваш рабочий email и название СТО.\n" +\
         "Либо направьте запрос в поддержку."
     callback_data.con_type = "CreateChat"
@@ -334,14 +345,26 @@ async def save_sto(message: types.Message, state: FSMContext) -> None:
 
     position = val_chan_list.index(product)
 
+    await db.insert("acces_users", dict(
+            user_id=message.from_user.id,
+            product=product,
+            email=email,
+            sto_name=sto_name,
+            permission=0
+    ))
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(
             text="Предоставить ссылку",
-            callback_data=AccesData(user_id=message.from_user.id, product=key_chan_list[position], permission=True).pack()),
+            callback_data=AccesData(user_id=message.from_user.id,
+                                    product=key_chan_list[position],
+                                    permission=True).pack()),
         types.InlineKeyboardButton(
             text="НЕ предоставлять ссылку",
-            callback_data=AccesData(user_id=message.from_user.id, product=key_chan_list[position], permission=False).pack()),
+            callback_data=AccesData(user_id=message.from_user.id,
+                                    product=key_chan_list[position],
+                                    permission=False).pack()),
         )
     
     await message.answer("Ожидайте ответа модератора.") 
@@ -355,9 +378,11 @@ async def save_sto(message: types.Message, state: FSMContext) -> None:
 
 @dp.callback_query(AccesData.filter(F.permission == True))
 async def grant_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
+    await db.update_acces_user_perm(callback.from_user.id, channel_chats[callback_data.product], 1)
+
     msg = f"Ссылка для подключения к чату по программе {channel_chats[callback_data.product]}\n" +\
         f"{channel_links[callback_data.product]}"
-    
+
     await callback.message.answer("Принят")
 
     await bot.send_message(
@@ -368,6 +393,8 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesData) ->
 
 @dp.callback_query(AccesData.filter(F.permission == False))
 async def decline_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
+    await db.delete("acces_users", )
+
     msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]} отклонен!"
     
     await callback.message.answer("Отклонен")
