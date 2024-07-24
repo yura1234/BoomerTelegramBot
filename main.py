@@ -62,6 +62,7 @@ api_id = int(config["General"]["ApiID"])
 api_hash = config["General"]["ApiHash"]
 
 support_chats = config["MainInformation.allPrograms.OnlySupportChats"]
+support_chats_type = config["MainInformation.allPrograms.OnlySupportChats.type"]
 support_users = list(config["SupportUsers"].values())
 
 channel_chats = config["MainInformation.allPrograms.OnlyChannelChats"]
@@ -148,7 +149,7 @@ async def order_parts(message: types.Message) -> None:
 async def support_chat(message: types.Message) -> None:
     msg = "Для получения более подробной информаци " +\
         f"или услуге Вы можете отправить сообщение на " +\
-        "запрос в чате ниже или на почту support@bimmer-online.com"
+        "запрос в чате ниже или на почту support@bimmer-online.ru"
 
     users = support_users.copy()
     users.append(message.from_user.username)
@@ -173,9 +174,15 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
     elif callback_data.chat_type == "DiagEquip":
         chat = diag_equip_chats
 
-    msg = "Для получения более подробной информаци по продукту " +\
-    f"\"{chat[callback_data.key]}\" или услуге Вы можете отправить сообщение на " +\
-    "запрос в чате ниже или на почту support@bimmer-online.com"
+    chat_type = ""
+    if support_chats_type[callback_data.key] == "продукт":
+        chat_type = "продукту"
+    else:
+        chat_type = "услуге"
+
+    msg = f"Для получения более подробной информации по {chat_type} " +\
+    f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
+    "запрос в чате ниже или на почту support@bimmer-online.ru"
     builder = InlineKeyboardBuilder()
     callback_data.con_type = "CreateChat"
 
@@ -186,9 +193,9 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
         )
     
     if callback_data.chat_type == "OrderParts" and callback_data.key == "chat3":
-        msg = "Уважаемые клиенты, перед отправкой запроса на поиск детали просьба ознакомиться с правилами заказа:" +\
-        "1) Сроки поставки составляют от 2-х месяцев" +\
-        "2) Вес одной детали не более 30 кг" +\
+        msg = "Уважаемые клиенты, перед отправкой запроса на поиск детали просьба ознакомиться с правилами заказа:\n" +\
+        "1) Сроки поставки составляют от 2-х месяцев\n" +\
+        "2) Вес одной детали не более 30 кг\n" +\
         "3) Максимальные габаритные размеры упаковки не должны превышать 180x60x60 см"
     elif callback_data.chat_type == "OrderParts" and (callback_data.key == "chat1" or callback_data.key == "chat2"):
         msg = "Напишите в чат Ваш запрос с указанием артикула детали и VIN номера автомобиля"
@@ -428,8 +435,8 @@ def add_button_keys(
 
 
 async def main() -> None:
-    add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 20, 3)
-    add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 15, 2)
+    add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 15, 2)
+    add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 10, 2)
     add_button_keys(order_parts_keys, order_chats, "OnlySupportChats", "OrderParts", 15, 2)
     add_button_keys(diag_equip_keys, diag_equip_chats, "OnlySupportChats", "DiagEquip", 15, 2)
 
