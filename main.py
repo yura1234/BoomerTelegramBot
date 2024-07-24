@@ -109,20 +109,6 @@ async def set_menu(bot: Bot) -> None:
 
 @dp.message(Command("diag_equipment"))
 async def diag_equipment(message: types.Message) -> None:
-    group_photos = MediaGroupBuilder()
-
-    for key,val in equip_dict.items():
-        # await message.answer_photo(
-        #     types.FSInputFile(path=path_photos + equip_photos[key]), caption=val
-        # )
-        # if key != "chat5":
-        group_photos.add(type="photo", media=types.FSInputFile(path=path_photos + equip_photos[key]), caption=val)
-
-    await bot.send_media_group(
-        chat_id=message.from_user.id,
-        media=group_photos.build()
-    )
-
     await message.answer(
         "Выберете необходимое оборудование для покупки",
         reply_markup=diag_equip_keys.as_markup()
@@ -167,18 +153,25 @@ async def support_chat(message: types.Message) -> None:
 
 @dp.callback_query(ChatType.filter(F.con_type == "OnlySupportChats"))
 async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -> None:
+    chat_type = ""
     if callback_data.chat_type == "OrderParts":
         chat = order_chats
     elif callback_data.chat_type == "Support":
         chat = support_chats
     elif callback_data.chat_type == "DiagEquip":
         chat = diag_equip_chats
+        chat_type = "оборудованию"
 
-    chat_type = ""
-    if support_chats_type[callback_data.key] == "продукт":
-        chat_type = "продукту"
-    else:
-        chat_type = "услуге"
+        await callback.message.answer_photo(
+            types.FSInputFile(path=path_photos + equip_photos[callback_data.key]),
+            caption=diag_equip_chats[callback_data.key]
+        )
+
+    if chat_type == "":
+        if support_chats_type[callback_data.key] == "продукт":
+            chat_type = "продукту"
+        else:
+            chat_type = "услуге"
 
     msg = f"Для получения более подробной информации по {chat_type} " +\
     f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
