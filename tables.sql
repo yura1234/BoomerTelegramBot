@@ -7,6 +7,7 @@ create table created_chats(
 );
 
 create table acces_users(
+    id integer primary key,
     user_id int,
     product text,
     email text,

@@ -52,13 +52,13 @@ class DataBase:
         rows = await all_data.fetchall()
 
         for row in rows:
-            if row[0] == user_id and row[1] == product and row[4] == 1:
+            if row[1] == user_id and row[2] == product:
                 return row
 
         return None
 
 
-    async def update_acces_user_perm(self, user_id: int, product: str, permission: bool) -> None:
+    async def update_acces_user_perm(self, user_id: int, product: str, permission: int) -> None:
         await self.conn.execute("UPDATE acces_users SET permission=?" +\
                                 "WHERE user_id=? AND product=?", 
                                 (permission, user_id, product))

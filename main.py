@@ -15,7 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.utils.media_group import MediaGroupBuilder
+# from aiogram.utils.media_group import MediaGroupBuilder
 
 from telethon.sync import TelegramClient
 from telethon import functions
@@ -61,17 +61,17 @@ bot_token = config["General"]["Token"]
 api_id = int(config["General"]["ApiID"])
 api_hash = config["General"]["ApiHash"]
 
-support_chats = config["MainInformation.allPrograms.OnlySupportChats"]
-support_chats_type = config["MainInformation.allPrograms.OnlySupportChats.type"]
+support_chats = config["allPrograms.OnlySupportChats"]
+support_chats_type = config["allPrograms.OnlySupportChats.type"]
 support_users = list(config["SupportUsers"].values())
 
-channel_chats = config["MainInformation.allPrograms.OnlyChannelChats"]
+channel_chats = config["allPrograms.OnlyChannelChats"]
 channel_links = config["OnlyChannelLinks"]
 
-order_chats = config["MainInformation.orderParts"]
+order_chats = config["orderParts"]
 
-diag_equip_chats = config["MainInformation.diagEquipment"]
-equip_photos = config["MainInformation.diagEquipment.PhotoPath"]
+diag_equip_chats = config["diagEquipment"]
+equip_photos = config["diagEquipment.PhotoPath"]
 
 path_photos = os.getcwd() + "\\photos\\"
 
@@ -162,10 +162,11 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
         chat = diag_equip_chats
         chat_type = "оборудованию"
 
-        await callback.message.answer_photo(
-            types.FSInputFile(path=path_photos + equip_photos[callback_data.key]),
-            caption=diag_equip_chats[callback_data.key]
-        )
+        if chat[callback_data.key] != "Написать запрос на оборудование":
+            await callback.message.answer_photo(
+                types.FSInputFile(path=path_photos + equip_photos[callback_data.key]),
+                caption=diag_equip_chats[callback_data.key]
+            )
 
     if chat_type == "":
         if support_chats_type[callback_data.key] == "продукт":
@@ -270,7 +271,7 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatType)
 async def only_channel_chats(callback: CallbackQuery, callback_data: ChatType, state: FSMContext) -> None:
     get_permission = await db.get_acces_user_channel(callback.from_user.id, channel_chats[callback_data.key])
 
-    if get_permission != None:
+    if get_permission != None and get_permission[-1] == 1:
         msg = f"Ссылка для подключения к чату по программе {channel_chats[callback_data.key]}\n" +\
             f"{channel_links[callback_data.key]}"
         
@@ -378,7 +379,7 @@ async def save_sto(message: types.Message, state: FSMContext) -> None:
 
 @dp.callback_query(AccesData.filter(F.permission == True))
 async def grant_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
-    await db.update_acces_user_perm(callback.from_user.id, channel_chats[callback_data.product], 1)
+    await db.update_acces_user_perm(callback_data.user_id, channel_chats[callback_data.product], 1)
 
     msg = f"Ссылка для подключения к чату по программе {channel_chats[callback_data.product]}\n" +\
         f"{channel_links[callback_data.product]}"
@@ -393,7 +394,9 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesData) ->
 
 @dp.callback_query(AccesData.filter(F.permission == False))
 async def decline_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
-    await db.delete("acces_users", )
+    row = await db.get_acces_user_channel(callback_data.user_id, channel_chats[callback_data.product])
+    if row != None:
+        await db.delete("acces_users", row[0])
 
     msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]} отклонен!"
     
@@ -456,7 +459,7 @@ def add_button_keys(
 
 async def main() -> None:
     add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 15, 2)
-    add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 10, 2)
+    add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 13, 2)
     add_button_keys(order_parts_keys, order_chats, "OnlySupportChats", "OrderParts", 15, 2)
     add_button_keys(diag_equip_keys, diag_equip_chats, "OnlySupportChats", "DiagEquip", 15, 2)
 

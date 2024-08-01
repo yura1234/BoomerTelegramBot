@@ -1,6 +1,5 @@
 /__pycache__
 *.session
 *.session-journal
-settings.ini
 *.log
 *.db
