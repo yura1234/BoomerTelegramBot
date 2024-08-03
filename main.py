@@ -23,6 +23,8 @@ from telethon import types as telethonTypes
 # from telethon.errors import PeerIdInvalidError
 from telethon.errors.rpcbaseerrors import BadRequestError
 
+from sqlite3 import IntegrityError
+
 import nest_asyncio
 nest_asyncio.apply()
 
@@ -129,6 +131,20 @@ async def order_parts(message: types.Message) -> None:
         "Выберете необходимую программу или услугу",
         reply_markup=order_parts_keys.as_markup()
     )
+
+
+@dp.message(Command("start"))
+async def start_bot(message: types.Message) -> None:
+    try:
+        await db.insert("users", dict(
+            user_id=message.from_user.id   
+        ))
+    except IntegrityError:
+        logging.info(f"User {message.from_user.id} already exist in database.")
+
+@dp.message(Command("broadcast"))
+async def broadcast_message(message: types.Message) -> None:
+    pass
 
 
 @dp.message(Command("support"))

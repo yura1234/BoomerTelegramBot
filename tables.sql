@@ -14,3 +14,8 @@ create table acces_users(
     sto_name text,
     permission int
 );
+
+create table users(
+    id integer primary key,
+    user_id int unique
+);
