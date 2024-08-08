@@ -15,6 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.exceptions import *
 # from aiogram.utils.media_group import MediaGroupBuilder
 
 from telethon.sync import TelegramClient
@@ -46,6 +47,10 @@ class UserData(StatesGroup):
     product = State()
     email = State()
     sto_name = State()
+
+
+class BroadcastData(StatesGroup):
+    distrib_message = State()
 
 
 log_file_format = f"log-{datetime.now().strftime("%d_%m_%Y-%H_%M_%S")}.log"
@@ -81,6 +86,8 @@ key_chan_list = list(channel_chats.keys())
 val_chan_list = list(channel_chats.values())
 
 moderators = config["Moderators"]
+
+admin = config["Admin"]
 
 all_program_keys = InlineKeyboardBuilder()
 order_parts_keys = InlineKeyboardBuilder()
@@ -142,9 +149,67 @@ async def start_bot(message: types.Message) -> None:
     except IntegrityError:
         logging.info(f"User {message.from_user.id} already exist in database.")
 
+
 @dp.message(Command("broadcast"))
-async def broadcast_message(message: types.Message) -> None:
-    pass
+async def broadcast_message(message: types.Message, state: FSMContext) -> None:
+    find_admin_user = await client(functions.users.GetFullUserRequest(
+        id=list(admin.values())[0]
+    ))
+    admin_id = find_admin_user.full_user.id
+
+    if admin_id == message.from_user.id:
+        await message.answer(
+            "Выберете сообщение для массовой рассылки пользователям:"
+        )
+        await state.set_state(BroadcastData.distrib_message)
+    else:
+        await message.answer(
+            "Вы не являетесь администратором данного телеграмм бота!"
+        )
+
+
+async def broadcaster(user_id: int, text: str = None, msg: types.Message = None) -> bool:
+    try:
+        if text != None:
+            await bot.send_message(user_id, text)
+        if msg != None:
+            if msg.video:
+                await bot.send_video(user_id, msg.video.file_id, caption=msg.caption)
+            if msg.photo:
+                await bot.send_photo(user_id, msg.photo[0].file_id, caption=msg.caption)
+    except TelegramRetryAfter as e:
+        logging.error(f"Target [ID:{user_id}]: Flood limit is exceeded. Sleep {e.retry_after} seconds.")
+        await asyncio.sleep(e.retry_after)
+        return await broadcaster(user_id, text, msg)
+    except TelegramForbiddenError as e:
+        logging.error(f"Target [ID:{user_id}]: blocked by user")
+    except TelegramNotFound as e:
+        logging.error(f"Target [ID:{user_id}]: invalid user ID")
+    except TelegramAPIError as e:
+        logging.exception(f"Target [ID:{user_id}]: failed")
+    else:
+        return True
+
+    return False
+
+
+@dp.message(BroadcastData.distrib_message)
+async def get_broadcast_message(message: types.Message, state: FSMContext) -> None:
+    await state.clear()
+
+    users = await db.get_all_user_ids()
+    count = 0
+    try:
+        for user_id in users:
+            if message.text:
+                if await broadcaster(user_id, message.text):
+                    count += 1
+            elif message.video or message.photo:
+                if await broadcaster(user_id, None, message):
+                    count += 1
+            await asyncio.sleep(.05)
+    finally:
+        logging.info(f"{count} messages successful sent.")
 
 
 @dp.message(Command("support"))

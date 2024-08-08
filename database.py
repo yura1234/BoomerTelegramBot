@@ -65,6 +65,12 @@ class DataBase:
         await self.conn.commit()
 
 
+    async def get_all_user_ids(self) -> list:
+        all_data = await self.conn.execute("SELECT user_id FROM users")
+        rows = await all_data.fetchall()
+
+        return [r[0] for r in rows]
+
     async def delete(self, table: str, id: int) -> None:
         await self.conn.execute(f"DELETE FROM {table} WHERE id={id};")
         await self.conn.commit()
