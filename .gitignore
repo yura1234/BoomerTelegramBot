@@ -3,3 +3,5 @@
 *.session-journal
 *.log
 *.sqlite*
+/migrations
+pyproject.toml

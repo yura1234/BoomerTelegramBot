@@ -63,6 +63,16 @@ logging.basicConfig(level=logging.INFO, filename=log_file_format, filemode="w",
 config = ConfigParser()
 config.read("settings.ini", encoding="utf-8")
 
+tortoise_orm_config = {
+    "connections": {"default": "sqlite://db.sqlite3"},
+    "apps": {
+        "models": {
+            "models": ["database_models", "aerich.models"],
+            "default_connection": "default",
+        },
+    },
+}
+
 bot_token = config["General"]["Token"]
 api_id = int(config["General"]["ApiID"])
 api_hash = config["General"]["ApiHash"]
@@ -145,7 +155,7 @@ async def start_bot(message: types.Message) -> None:
         user_name = ""
         if message.from_user.username != None:
             user_name = message.from_user.username
-            
+
         await User.create(
             user_id=message.from_user.id,
             username=user_name,
@@ -314,16 +324,18 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
             get_chat = None
 
     if get_chat == None:
+        user_entity = await client.get_input_entity(user_id)
+
         result = await client(functions.messages.CreateChatRequest(
-            users=[*support_users, user_id],
+            users=[*support_users, user_entity],
             title=chat_name
         ))
-        
+
         chat_id = result.updates.updates[1].participants.chat_id
 
         chat = await client.get_entity(telethonTypes.PeerChat(chat_id))   
         chat_link = await client(functions.messages.ExportChatInviteRequest(
-                peer=chat
+            peer=chat
         ))
         
         await SupportChat.create(
@@ -594,11 +606,12 @@ def add_button_keys(
 
 
 async def main() -> None:
-    await Tortoise.init(
-        db_url='sqlite://db.sqlite3',
-        modules={'models': ['database_models']}
-    )
-    await Tortoise.generate_schemas()
+    # await Tortoise.init(
+    #     db_url='sqlite://db.sqlite3',
+    #     modules={'models': ['database_models']}
+    # )
+    # await Tortoise.generate_schemas()
+    await Tortoise.init(tortoise_orm_config)
 
     add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 15, 2)
     add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 13, 2)
