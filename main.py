@@ -89,7 +89,7 @@ order_chats = config["orderParts"]
 diag_equip_chats = config["diagEquipment"]
 equip_photos = config["diagEquipment.PhotoPath"]
 
-path_photos = os.getcwd() + "\\photos\\"
+path_photos = os.path.join(os.getcwd(), "photos")
 
 key_chan_list = list(channel_chats.keys())
 val_chan_list = list(channel_chats.values())
