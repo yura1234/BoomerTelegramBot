@@ -6,7 +6,6 @@ import os
 from configparser import ConfigParser
 from datetime import datetime
 
-
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
 from aiogram.filters.callback_data import CallbackData
@@ -16,12 +15,10 @@ from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import *
-# from aiogram.utils.media_group import MediaGroupBuilder
 
 from telethon.sync import TelegramClient
 from telethon import functions
 from telethon import types as telethonTypes
-# from telethon.errors import PeerIdInvalidError
 from telethon.errors.rpcbaseerrors import BadRequestError
 
 from aiogram.types import User as TgUser
@@ -52,7 +49,7 @@ class UserData(StatesGroup):
     sto_name = State()
 
 
-class BroadcastData(StatesGroup):
+class BroadcastState(StatesGroup):
     distrib_message = State()
 
 
@@ -89,7 +86,7 @@ order_chats = config["orderParts"]
 diag_equip_chats = config["diagEquipment"]
 equip_photos = config["diagEquipment.PhotoPath"]
 
-path_photos = os.getcwd() + "\\photos\\"
+path_photos = os.path.join(os.getcwd(), "photos")
 
 key_chan_list = list(channel_chats.keys())
 val_chan_list = list(channel_chats.values())
@@ -180,26 +177,39 @@ async def broadcast_message(message: types.Message, state: FSMContext) -> None:
         await message.answer(
             "Выберете сообщение для массовой рассылки пользователям:"
         )
-        await state.set_state(BroadcastData.distrib_message)
+        await state.set_state(BroadcastState.distrib_message)
     else:
         await message.answer(
             "Вы не являетесь администратором данного телеграмм бота!"
         )
 
 
-async def broadcaster(user_id: int, text: str = None, msg: types.Message = None) -> bool:
+async def broadcaster(user_id: int, broadcast_data: BroadcastData) -> bool:
     try:
-        if text != None:
-            await bot.send_message(user_id, text)
-        if msg != None:
-            if msg.video:
-                await bot.send_video(user_id, msg.video.file_id, caption=msg.caption)
-            if msg.photo:
-                await bot.send_photo(user_id, msg.photo[0].file_id, caption=msg.caption)
+        if broadcast_data.type == BroadcastData.TypeMessage.TEXT:
+            message = await bot.send_message(chat_id=user_id, 
+                                   text=broadcast_data.caption_text
+            )
+        elif broadcast_data.type == BroadcastData.TypeMessage.VIDEO:
+            message = await bot.send_video(chat_id=user_id, 
+                                 video=broadcast_data.file_id, 
+                                 caption=broadcast_data.caption_text
+            )
+        elif broadcast_data.type == BroadcastData.TypeMessage.PHOTO:
+            message = await bot.send_photo(chat_id=user_id, 
+                                 photo=broadcast_data.file_id, 
+                                 caption=broadcast_data.caption_text
+            )
+
+        await BroadcastDataHistory.create(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            broadcast_data_id=broadcast_data.id
+        )
     except TelegramRetryAfter as e:
         logging.error(f"Target [ID:{user_id}]: Flood limit is exceeded. Sleep {e.retry_after} seconds.")
         await asyncio.sleep(e.retry_after)
-        return await broadcaster(user_id, text, msg)
+        return await broadcaster(user_id, broadcast_data)
     except TelegramForbiddenError as e:
         logging.error(f"Target [ID:{user_id}]: blocked by user")
     except TelegramNotFound as e:
@@ -212,20 +222,36 @@ async def broadcaster(user_id: int, text: str = None, msg: types.Message = None)
     return False
 
 
-@dp.message(BroadcastData.distrib_message)
+@dp.message(BroadcastState.distrib_message)
 async def get_broadcast_message(message: types.Message, state: FSMContext) -> None:
     await state.clear()
 
+    if message.text:
+        msg_type = BroadcastData.TypeMessage.TEXT
+        text = message.text
+        file_id = ""
+    elif message.video:
+        msg_type = BroadcastData.TypeMessage.VIDEO
+        text = message.caption
+        file_id = message.video.file_id
+    elif message.photo:
+        msg_type = BroadcastData.TypeMessage.PHOTO
+        text = message.caption
+        file_id = message.photo[0].file_id
+
+    broadcast_data = await BroadcastData.create(
+        type=msg_type,
+        caption_text=text,
+        file_id=file_id
+    )
+
     all_users = await User.all()
+    logging.info(f"Start broadcast message for {len(all_users)} users.")
     count = 0
     try:
         for user in all_users:
-            if message.text:
-                if await broadcaster(user.user_id, message.text):
-                    count += 1
-            elif message.video or message.photo:
-                if await broadcaster(user.user_id, None, message):
-                    count += 1
+            if await broadcaster(user.user_id, broadcast_data):
+                count += 1
             await asyncio.sleep(.05)
     finally:
         logging.info(f"{count} messages successful sent.")
@@ -537,7 +563,7 @@ async def decline_permission(callback: CallbackQuery, callback_data: AccesData) 
     get_perm = await AccesChannelUser.get_or_none(
         user_id=callback_data.user_id, 
         product=channel_chats[callback_data.product],
-        permission=0
+        permission=False
     )
 
     if get_perm != None:
@@ -606,24 +632,12 @@ def add_button_keys(
 
 
 async def main() -> None:
-    # await Tortoise.init(
-    #     db_url='sqlite://db.sqlite3',
-    #     modules={'models': ['database_models']}
-    # )
-    # await Tortoise.generate_schemas()
     await Tortoise.init(tortoise_orm_config)
 
     add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 15, 2)
     add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 13, 2)
     add_button_keys(order_parts_keys, order_chats, "OnlySupportChats", "OrderParts", 15, 2)
     add_button_keys(diag_equip_keys, diag_equip_chats, "OnlySupportChats", "DiagEquip", 15, 2)
-
-    # for i in range(len(support_users)):
-    #     find_user = await client(
-    #         functions.users.GetFullUserRequest(
-    #         id=support_users[i]
-    #     ))
-    #     support_users[i] = find_user.full_user.id
 
     dp.startup.register(set_menu)
     await dp.start_polling(bot)

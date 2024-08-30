@@ -1,5 +1,6 @@
 from tortoise.models import Model
 from tortoise import fields
+from enum import StrEnum
 
 
 class User(Model):
@@ -32,3 +33,32 @@ class AccesChannelUser(Model):
 
     class Meta:
         table = "acces_channel_users"
+
+
+class BroadcastData(Model):
+
+    class TypeMessage(StrEnum):
+        TEXT = "TEXT"
+        PHOTO = "PHOTO"
+        VIDEO = "VIDEO"
+
+    id = fields.IntField(primary_key=True)
+    type = fields.CharEnumField(
+        enum_type=TypeMessage,
+        default=TypeMessage.TEXT
+    )
+    caption_text = fields.TextField()
+    file_id = fields.TextField()
+    created_date = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "broadcast_data"
+
+
+class BroadcastDataHistory(Model):
+    chat_id = fields.IntField()
+    message_id = fields.IntField()
+    broadcast_data = fields.ForeignKeyField("models.BroadcastData", on_delete=fields.CASCADE)
+
+    class Meta:
+        table = "broadcast_data_history"
