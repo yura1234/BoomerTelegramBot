@@ -50,13 +50,14 @@ class BroadcastData(Model):
     caption_text = fields.TextField()
     file_id = fields.TextField()
     created_date = fields.DatetimeField(auto_now_add=True)
+    updated_date = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "broadcast_data"
 
 
 class BroadcastDataHistory(Model):
-    chat_id = fields.IntField()
+    user = fields.ForeignKeyField("models.User", on_delete=fields.CASCADE)
     message_id = fields.IntField()
     broadcast_data = fields.ForeignKeyField("models.BroadcastData", on_delete=fields.CASCADE)
 
