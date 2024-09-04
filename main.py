@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pytz
 
 from configparser import ConfigParser
-from datetime import datetime
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
@@ -92,6 +91,8 @@ support_chats = config["allPrograms.OnlySupportChats"]
 support_chats_type = config["allPrograms.OnlySupportChats.type"]
 support_users = list(config["SupportUsers"].values())
 
+coding_services_chats = config["allPrograms.CodingServicesChats"]
+
 channel_chats = config["allPrograms.OnlyChannelChats"]
 channel_links = config["OnlyChannelLinks"]
 
@@ -110,6 +111,7 @@ moderators = config["Moderators"]
 admin = config["Admin"]
 
 all_program_keys = InlineKeyboardBuilder()
+coding_services_keys = InlineKeyboardBuilder()
 order_parts_keys = InlineKeyboardBuilder()
 diag_equip_keys = InlineKeyboardBuilder()
 
@@ -128,6 +130,7 @@ dp = Dispatcher()
 async def set_menu(bot: Bot) -> None:
     main_menu_commands = [
         BotCommand(command="/all_programs", description="Все программы"),
+        BotCommand(command="/coding_services", description="Услуги по кодированию"),
         BotCommand(command="/diag_equipment", description="Диагностическое оборудование"),
         BotCommand(command="/order_parts", description="Заказ запчастей"),
         BotCommand(command="/show_last_news", description="Последние новости за месяц"),
@@ -150,6 +153,14 @@ async def all_programs(message: types.Message) -> None:
     await message.answer(
         "Выберете необходимую программу или услугу",
         reply_markup=all_program_keys.as_markup()
+    )
+
+
+@dp.message(Command("coding_services"))
+async def all_programs(message: types.Message) -> None:
+    await message.answer(
+        "Выберете необходимую программу или услугу",
+        reply_markup=coding_services_keys.as_markup()
     )
 
 
@@ -338,13 +349,13 @@ async def delete_broadcast_message(
     callback: CallbackQuery,
     callback_data: BroadcastBtnCallback
 ) -> None:
-    picked_message = await BroadcastData.get(id=callback_data.id)
+    picked_message = await BroadcastData.get_or_none(id=callback_data.id)
     
-    # if picked_message == None:
-    #     await callback.message.answer(
-    #         "Данная новость была удалена ранее!"
-    #     )
-    #     return
+    if picked_message == None:
+        await callback.message.answer(
+            "Данная новость была удалена ранее!"
+        )
+        return
     
     diff_time = datetime.now(pytz.timezone("Europe/Moscow")) - picked_message.created_date
     if diff_time.days < 2:
@@ -399,7 +410,13 @@ async def edit_broadcast_message(message: types.Message, state: FSMContext) -> N
     message_id = data.get("id")
     await state.clear()
 
-    find_message = await BroadcastData.get(id=int(message_id))
+    find_message = await BroadcastData.get_or_none(id=int(message_id))
+
+    if find_message == None:
+        await message.answer(
+            "Данная новость была удалена ранее!"
+        )
+        return
 
     if message.text:
         msg_type = BroadcastData.TypeMessage.TEXT
@@ -553,7 +570,10 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatType) -
     if callback_data.chat_type == "OrderParts":
         chat = order_chats
     elif callback_data.chat_type == "Support":
-        chat = support_chats
+        if callback_data.key in support_chats.keys():
+            chat = support_chats
+        else:
+            chat = coding_services_chats
     elif callback_data.chat_type == "DiagEquip":
         chat = diag_equip_chats
         chat_type = "оборудованию"
@@ -642,7 +662,10 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
 @dp.callback_query(ChatType.filter(F.con_type == "CreateChat"))
 async def create_support_chats(callback: CallbackQuery, callback_data: ChatType) -> None:
     if callback_data.chat_type == "Support":
-        chat = support_chats
+        if callback_data.key in support_chats.keys():
+            chat = support_chats
+        else:
+            chat = coding_services_chats
     elif callback_data.chat_type == "Channel":
         chat = channel_chats
     elif callback_data.chat_type == "OrderParts":
@@ -819,6 +842,15 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesData) ->
         text=msg
     )
 
+    find_admin_user = await client(functions.users.GetFullUserRequest(
+        id=list(admin.values())[0]
+    ))
+
+    await bot.send_message(
+        chat_id=find_admin_user.full_user.id,
+        text=f"Новый запрос на подключение в группу {channel_chats[callback_data.product]}."
+    )
+
 
 @dp.callback_query(AccesData.filter(F.permission == False))
 async def decline_permission(callback: CallbackQuery, callback_data: AccesData) -> None:
@@ -898,6 +930,7 @@ async def main() -> None:
 
     add_button_keys(all_program_keys, channel_chats, "OnlyChannelChats", "Channel", 15, 2)
     add_button_keys(all_program_keys, support_chats, "OnlySupportChats", "Support", 13, 2)
+    add_button_keys(coding_services_keys, coding_services_chats, "OnlySupportChats", "Support", 13, 2)
     add_button_keys(order_parts_keys, order_chats, "OnlySupportChats", "OrderParts", 15, 2)
     add_button_keys(diag_equip_keys, diag_equip_chats, "OnlySupportChats", "DiagEquip", 15, 2)
 
