@@ -129,7 +129,8 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
             get_chat = None
 
     if get_chat == None:
-        user_entity = await client.get_input_entity(user_id)
+        user_entity = await client.get_entity(telethonTypes.PeerUser(user_id))
+        # user_entity = await client.get_input_entity(telethonTypes.PeerUser(user_id))
         result = await client(functions.messages.CreateChatRequest(
             users=[*support_users, user_entity],
             title=chat_name

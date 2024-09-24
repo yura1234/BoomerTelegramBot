@@ -12,20 +12,20 @@ all_program_keys = InlineKeyboardBuilder()
 coding_services_keys = InlineKeyboardBuilder()
 order_parts_keys = InlineKeyboardBuilder()
 diag_equip_keys = InlineKeyboardBuilder()
-add_button_keys(all_program_keys, 
-                config["allPrograms.OnlyChannelChats"], 
+add_button_keys(all_program_keys,
+                config["allPrograms.OnlyChannelChats"],
                 "OnlyChannelChats", "Channel", 15, 2)
-add_button_keys(all_program_keys, 
-                config["allPrograms.OnlySupportChats"], 
+add_button_keys(all_program_keys,
+                config["allPrograms.OnlySupportChats"],
                 "OnlySupportChats", "Support", 13, 2)
-add_button_keys(coding_services_keys, 
-                config["allPrograms.CodingServicesChats"], 
+add_button_keys(coding_services_keys,
+                config["allPrograms.CodingServicesChats"],
                 "OnlySupportChats", "Support", 13, 2)
-add_button_keys(order_parts_keys, 
-                config["orderParts"], 
+add_button_keys(order_parts_keys,
+                config["orderParts"],
                 "OnlySupportChats", "OrderParts", 15, 2)
-add_button_keys(diag_equip_keys, 
-                config["diagEquipment"], 
+add_button_keys(diag_equip_keys,
+                config["diagEquipment"],
                 "OnlySupportChats", "DiagEquip", 15, 2)
 
 
