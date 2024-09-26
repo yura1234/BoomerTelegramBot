@@ -12,8 +12,12 @@ async def on_startup() -> None:
     await Tortoise.init(tortoise_orm_config)
     await client.start()
 
-    dp.include_routers(user.router, admin.router, menu.router, 
-                       support_chat.router, channel_chat.router)
+    dp.include_routers(user.router, 
+                       admin.router, 
+                       menu.router, 
+                       support_chat.router, 
+                       channel_chat.router,
+    )
 
     dp.startup.register(menu.set_menu)
     logging.info("Bot started.")

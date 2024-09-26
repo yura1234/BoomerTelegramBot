@@ -9,10 +9,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from telethon import functions
 from telethon import types as telethonTypes
 from telethon.errors.rpcbaseerrors import BadRequestError
+from tortoise import timezone
 
-from loader import config, client
+from loader import config, client, bot
 from bot.models.callback import ChatTypeCallback
-from bot.models.database import SupportChat
+from bot.models.database import SupportChat, LastUserMessage
 
 
 router = Router()
@@ -43,10 +44,29 @@ def get_user_title(user_data: TgUser) -> str | int:
         return user_data.id
 
 
+async def erase_message(user_id: int, message_id: int) -> None:
+    last_message = await LastUserMessage.get_or_none(user_id=user_id)
+
+    if last_message == None:
+        await LastUserMessage.create(user_id=user_id, 
+                                     message_id=message_id
+        )
+    else:
+        current_time = timezone.now()
+        if (current_time - last_message.created_date).days < 2:
+            await bot.delete_message(
+                chat_id=last_message.user_id,
+                message_id=last_message.message_id
+            )
+
+        last_message.message_id = message_id
+        await last_message.save()
+
+
 @router.message(Command("support"))
 async def support_chat(message: Message) -> None:
     msg = "Для получения более подробной информаци " +\
-        f"или услуге Вы можете отправить сообщение на " +\
+        "или услуге Вы можете отправить сообщение на " +\
         "запрос в чате ниже или на почту support@bimmer-online.ru"
 
     user = get_user_title(message.from_user)    
@@ -70,6 +90,8 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
     elif callback_data.chat_type == "Support":
         if callback_data.key in support_chats.keys():
             chat = support_chats
+            if support_chats_type[callback_data.key] == "поддержка":
+                chat_type = "поддержка"
         else:
             chat = coding_services_chats
     elif callback_data.chat_type == "DiagEquip":
@@ -88,9 +110,14 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
         else:
             chat_type = "услуге"
 
-    msg = f"Для получения более подробной информации по {chat_type} " +\
-    f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
-    "запрос в чате ниже или на почту support@bimmer-online.ru"
+        msg = f"Для получения более подробной информации по {chat_type} " +\
+        f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
+        "запрос в чате ниже или на почту support@bimmer-online.ru"
+    elif chat_type == "поддержка":
+        msg = "Для получения более подробной информаци " +\
+            "или услуге Вы можете отправить сообщение на " +\
+            "запрос в чате ниже или на почту support@bimmer-online.ru"
+
     builder = InlineKeyboardBuilder()
     callback_data.con_type = "CreateChat"
 
@@ -108,10 +135,11 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
     elif callback_data.chat_type == "OrderParts" and (callback_data.key == "chat1" or callback_data.key == "chat2"):
         msg = "Напишите в чат Ваш запрос с указанием артикула детали и VIN номера автомобиля"
 
-    await callback.message.answer(
+    answer_message = await callback.message.answer(
         msg,
         reply_markup=builder.as_markup()
     )
+    await erase_message(callback.from_user.id, answer_message.message_id)
 
 
 async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
@@ -170,15 +198,23 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatTypeC
         chat = diag_equip_chats
 
     user = get_user_title(callback.from_user)
-    chat_name = f"{user} продукт {chat[callback_data.key]}"
-
-    if callback_data.chat_type == "DiagEquip" and callback_data.key == "chat5":
+    if support_chats_type[callback_data.key] == "поддержка":
+        chat_name = f"{user} запрос поддержки"
+    elif callback_data.chat_type == "DiagEquip" and callback_data.key == "chat5":
         chat_name = f"{user} запрос на оборудование"
+    else:    
+        chat_name = f"{user} {support_chats_type[callback_data.key]} {chat[callback_data.key]}"
 
     link = await create_chat(callback.from_user.id, chat_name, chat[callback_data.key])
 
-    msg = f"По вашему запросу продукта {chat[callback_data.key]} был создан чат, ссылка на чат {link}"
-    await callback.message.answer(
+    if support_chats_type[callback_data.key] == "поддержка":
+        msg = f"По вашему запросу поддержки был создан чат, ссылка на чат {link}"
+    else:
+        msg = f"По вашему запросу {support_chats_type[callback_data.key]} " +\
+            f"{chat[callback_data.key]} был создан чат, ссылка на чат {link}"
+    
+    answer_message = await callback.message.answer(
         msg
     )
+    await erase_message(callback.from_user.id, answer_message.message_id)
     logger.info(f"User {callback.from_user.id} get chat link - {link}")

@@ -63,3 +63,12 @@ class BroadcastDataHistory(Model):
 
     class Meta:
         table = "broadcast_data_history"
+
+
+class LastUserMessage(Model):
+    message_id = fields.IntField()
+    user = fields.ForeignKeyField("models.User", on_delete=fields.CASCADE)
+    created_date = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "last_user_message"
