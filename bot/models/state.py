@@ -7,6 +7,12 @@ class UserState(StatesGroup):
     sto_name = State()
 
 
+class ModeratorChannelState(StatesGroup):
+    user_id = State()
+    product = State()
+    decline_comment = State()
+
+
 class BroadcastState(StatesGroup):
     distrib_message = State()
     edit_message = State()

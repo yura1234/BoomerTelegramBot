@@ -30,6 +30,7 @@ class AccesChannelUser(Model):
     sto_name = fields.TextField()
     permission = fields.BooleanField()
     user = fields.ForeignKeyField("models.User", on_delete=fields.CASCADE)
+    decline_comment = fields.TextField(null=True)
 
     class Meta:
         table = "acces_channel_users"

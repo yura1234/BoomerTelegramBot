@@ -10,7 +10,7 @@ from telethon import functions
 from loader import config, client, bot
 from bot.models.callback import ChatTypeCallback, AccesUserCallback
 from bot.models.database import AccesChannelUser, User
-from bot.models.state import UserState
+from bot.models.state import UserState, ModeratorChannelState
 
 
 router = Router()
@@ -113,7 +113,7 @@ async def save_sto(message: Message, state: FSMContext) -> None:
 
     position = val_chan_list.index(product)
 
-    await AccesChannelUser.create(
+    await AccesChannelUser.get_or_create(
         product=product,
         email=email,
         sto_name=sto_name,
@@ -160,7 +160,6 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesUserCall
                         f" and Product {channel_chats[callback_data.product]}")
         await callback.message.answer(f"Ошибка! Пользователь c ID {callback_data.user_id} с продуктом " +\
                             f"{channel_chats[callback_data.product]} не был найден в базе данных!")
-
         return
 
     msg = f"Ссылка для подключения к чату по программе {channel_chats[callback_data.product]}\n" +\
@@ -175,24 +174,51 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesUserCall
 
 
 @router.callback_query(AccesUserCallback.filter(F.permission == False))
-async def decline_permission(callback: CallbackQuery, callback_data: AccesUserCallback) -> None:
-    get_perm = await AccesChannelUser.get_or_none(
-        user_id=callback_data.user_id, 
-        product=channel_chats[callback_data.product],
-        permission=False
-    )
-
-    if get_perm != None:
-        await get_perm.delete()
-    else:
-        await callback.message.answer("Решение по данному клиенту было принято ранее!")
-        return
-
-    msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]} отклонен!"
+async def decline_permission(callback: CallbackQuery,
+                             callback_data: AccesUserCallback,
+                             state: FSMContext
+) -> None:
+    msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]} отклонен!"+\
+        " О причинах отказа ожидайте ответа от модератора."
     
     await callback.message.answer("Отклонен")
-
     await bot.send_message(
         chat_id=callback_data.user_id,
         text=msg
     )
+
+    await callback.message.answer("Введите причину отказа:")
+    await state.update_data(user_id=callback_data.user_id)
+    await state.update_data(product=channel_chats[callback_data.product])
+    await state.set_state(ModeratorChannelState.decline_comment)
+
+
+@router.message(ModeratorChannelState.decline_comment)
+async def decline_comment(message: Message, state: FSMContext) -> None:
+    decline_comment = message.text
+
+    data = await state.get_data()
+    user_id = int(data.get("user_id"))
+    product = data.get("product")
+    await state.clear()
+
+    await bot.send_message(
+        user_id,
+        f"Ответ модератора по вашему запросу в чат {product}:\n" +\
+        decline_comment
+    )
+
+    get_perm = await AccesChannelUser.get_or_none(
+        user_id=user_id,
+        product=product,
+        permission=False
+    )
+
+    if get_perm != None:
+        get_perm.decline_comment = decline_comment
+        await get_perm.save()
+    else:
+        logger.warning(f"Can't find record in acces_channel_users for User {user_id}" +\
+                        f" and Product {channel_chats[product]}")
+        await message.answer(f"Ошибка! Пользователь c ID {user_id} с продуктом " +\
+                            f"{channel_chats[product]} не был найден в базе данных!")
