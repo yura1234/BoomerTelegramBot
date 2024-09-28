@@ -113,12 +113,14 @@ async def save_sto(message: Message, state: FSMContext) -> None:
 
     position = val_chan_list.index(product)
 
-    await AccesChannelUser.get_or_create(
+    await AccesChannelUser.update_or_create(
         product=product,
-        email=email,
-        sto_name=sto_name,
+        user_id=message.from_user.id,
         permission=False,
-        user_id=message.from_user.id
+        defaults={
+            "email":email,
+            "sto_name":sto_name,
+        }
     )
 
     builder = InlineKeyboardBuilder()

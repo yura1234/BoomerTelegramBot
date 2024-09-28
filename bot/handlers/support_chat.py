@@ -109,14 +109,14 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
             chat_type = "продукту"
         else:
             chat_type = "услуге"
-
-        msg = f"Для получения более подробной информации по {chat_type} " +\
-        f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
-        "запрос в чате ниже или на почту support@bimmer-online.ru"
     elif chat_type == "поддержка":
         msg = "Для получения более подробной информаци " +\
             "или услуге Вы можете отправить сообщение на " +\
             "запрос в чате ниже или на почту support@bimmer-online.ru"
+    
+    msg = f"Для получения более подробной информации по {chat_type} " +\
+        f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
+        "запрос в чате ниже или на почту support@bimmer-online.ru"
 
     builder = InlineKeyboardBuilder()
     callback_data.con_type = "CreateChat"

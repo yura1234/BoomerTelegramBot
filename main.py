@@ -1,22 +1,27 @@
 import asyncio
 import logging
-from loader import *
 from datetime import datetime
 from tortoise import Tortoise
 
+from loader import client, tortoise_orm_config, dp, bot
+
+
 from bot.handlers import user, admin, menu,\
-                 support_chat, channel_chat
+                 support_chat, channel_chat,\
+                 chanel_chat_listener
 
 
 async def on_startup() -> None:
     await Tortoise.init(tortoise_orm_config)
     await client.start()
 
-    dp.include_routers(user.router, 
-                       admin.router, 
-                       menu.router, 
-                       support_chat.router, 
-                       channel_chat.router,
+    dp.include_routers(
+        user.router,
+        admin.router,
+        menu.router,
+        support_chat.router,
+        channel_chat.router,
+        chanel_chat_listener.router
     )
 
     dp.startup.register(menu.set_menu)
