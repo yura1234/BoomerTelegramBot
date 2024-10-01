@@ -1,5 +1,5 @@
-import asyncio
 import logging
+import asyncio
 from datetime import datetime
 from tortoise import Tortoise
 
@@ -35,11 +35,12 @@ async def on_shutdown() -> None:
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO,
-                    filename=f"log-{datetime.now().strftime("%d_%m_%Y-%H_%M_%S")}.log",
-                    filemode="w",
-                    encoding='utf-8',
-                    format="%(asctime)s %(levelname)s %(message)s"
+    logging.basicConfig(
+        level=logging.INFO,
+        filename=f"log-{datetime.now().strftime("%d_%m_%Y-%H_%M_%S")}.log",
+        filemode="w",
+        encoding='utf-8',
+        format="%(asctime)s %(levelname)s %(message)s"
     )
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)

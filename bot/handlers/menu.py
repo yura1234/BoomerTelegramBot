@@ -12,21 +12,33 @@ all_program_keys = InlineKeyboardBuilder()
 coding_services_keys = InlineKeyboardBuilder()
 order_parts_keys = InlineKeyboardBuilder()
 diag_equip_keys = InlineKeyboardBuilder()
-add_button_keys(all_program_keys,
-                config["allPrograms.OnlyChannelChats"],
-                "OnlyChannelChats", "Channel", 15, 2)
-add_button_keys(all_program_keys,
-                config["allPrograms.OnlySupportChats"],
-                "OnlySupportChats", "Support", 13, 2)
-add_button_keys(coding_services_keys,
-                config["allPrograms.CodingServicesChats"],
-                "OnlySupportChats", "Support", 13, 2)
-add_button_keys(order_parts_keys,
-                config["orderParts"],
-                "OnlySupportChats", "OrderParts", 15, 2)
-add_button_keys(diag_equip_keys,
-                config["diagEquipment"],
-                "OnlySupportChats", "DiagEquip", 15, 2)
+
+
+add_button_keys(
+    all_program_keys,
+    config["allPrograms.OnlyChannelChats"],
+    "OnlyChannelChats", "Channel", 15, 2
+)
+add_button_keys(
+    all_program_keys,
+    config["allPrograms.OnlySupportChats"],
+    "OnlySupportChats", "Support", 13, 2
+)
+add_button_keys(
+    coding_services_keys,
+    config["allPrograms.CodingServicesChats"],
+    "OnlySupportChats", "Support", 13, 2
+)
+add_button_keys(
+    order_parts_keys,
+    config["orderParts"],
+    "OnlySupportChats", "OrderParts", 15, 2
+)
+add_button_keys(
+    diag_equip_keys,
+    config["diagEquipment"],
+    "OnlySupportChats", "DiagEquip", 15, 2
+)
 
 
 async def set_menu(bot: Bot) -> None:
@@ -58,7 +70,7 @@ async def all_programs(message: Message) -> None:
 
 
 @router.message(Command("coding_services"))
-async def all_programs(message: Message) -> None:
+async def coding_services(message: Message) -> None:
     await message.answer(
         "Выберете необходимую программу или услугу",
         reply_markup=coding_services_keys.as_markup()

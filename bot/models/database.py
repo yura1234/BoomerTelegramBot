@@ -1,6 +1,6 @@
+from enum import StrEnum
 from tortoise.models import Model
 from tortoise import fields
-from enum import StrEnum
 
 
 class User(Model):
@@ -69,7 +69,7 @@ class BroadcastDataHistory(Model):
 class LastUserMessage(Model):
     message_id = fields.IntField()
     user = fields.ForeignKeyField("models.User", on_delete=fields.CASCADE)
-    created_date = fields.DatetimeField(auto_now_add=True)
+    updated_date = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "last_user_message"

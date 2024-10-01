@@ -36,9 +36,9 @@ path_photos = os.path.join(os.getcwd(), "photos", "")
 
 
 def get_user_title(user_data: TgUser) -> str | int:
-    if user_data.username != None:
+    if user_data.username:
         return user_data.username
-    elif user_data.full_name != None:
+    elif user_data.full_name:
         return user_data.full_name
     else:
         return user_data.id
@@ -47,13 +47,14 @@ def get_user_title(user_data: TgUser) -> str | int:
 async def erase_message(user_id: int, message_id: int) -> None:
     last_message = await LastUserMessage.get_or_none(user_id=user_id)
 
-    if last_message == None:
-        await LastUserMessage.create(user_id=user_id, 
-                                     message_id=message_id
+    if last_message is None:
+        await LastUserMessage.create(
+            user_id=user_id,
+            message_id=message_id
         )
     else:
         current_time = timezone.now()
-        if (current_time - last_message.created_date).days < 2:
+        if (current_time - last_message.updated_date).days < 2:
             await bot.delete_message(
                 chat_id=last_message.user_id,
                 message_id=last_message.message_id
@@ -69,7 +70,7 @@ async def support_chat(message: Message) -> None:
         "или услуге Вы можете отправить сообщение на " +\
         "запрос в чате ниже или на почту support@bimmer-online.ru"
 
-    user = get_user_title(message.from_user)    
+    user = get_user_title(message.from_user)
 
     chat_name = f"{user} запрос поддержки"
 
@@ -113,7 +114,7 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
         msg = "Для получения более подробной информаци " +\
             "или услуге Вы можете отправить сообщение на " +\
             "запрос в чате ниже или на почту support@bimmer-online.ru"
-    
+
     msg = f"Для получения более подробной информации по {chat_type} " +\
         f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
         "запрос в чате ниже или на почту support@bimmer-online.ru"
@@ -128,11 +129,12 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
         )
 
     if callback_data.chat_type == "OrderParts" and callback_data.key == "chat3":
-        msg = "Уважаемые клиенты, перед отправкой запроса на поиск детали просьба ознакомиться с правилами заказа:\n" +\
-        "1) Сроки поставки составляют от 2-х месяцев\n" +\
-        "2) Вес одной детали не более 30 кг\n" +\
-        "3) Максимальные габаритные размеры упаковки не должны превышать 180x60x60 см"
-    elif callback_data.chat_type == "OrderParts" and (callback_data.key == "chat1" or callback_data.key == "chat2"):
+        msg = "Уважаемые клиенты, перед отправкой запроса на поиск детали " +\
+            "просьба ознакомиться с правилами заказа:\n" +\
+            "1) Сроки поставки составляют от 2-х месяцев\n" +\
+            "2) Вес одной детали не более 30 кг\n" +\
+            "3) Максимальные габаритные размеры упаковки не должны превышать 180x60x60 см"
+    elif callback_data.chat_type == "OrderParts" and callback_data.key in ("chat1", "chat2"):
         msg = "Напишите в чат Ваш запрос с указанием артикула детали и VIN номера автомобиля"
 
     answer_message = await callback.message.answer(
@@ -148,28 +150,35 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
         user_id=user_id
     )
 
-    if get_chat != None:
+    if get_chat:
         try:
-            await client(functions.messages.CheckChatInviteRequest(hash=get_chat.link.split("/")[-1][1:]))
+            await client(
+                functions.messages.CheckChatInviteRequest(
+                    hash=get_chat.link.split("/")[-1][1:]
+                )
+            )
         except BadRequestError:
             await get_chat.delete()
             logger.info(f"Chat with id {get_chat.chat_id} was deleted! Сreate new chat.")
             get_chat = None
 
-    if get_chat == None:
+    if get_chat is None:
         user_entity = await client.get_entity(telethonTypes.PeerUser(user_id))
         # user_entity = await client.get_input_entity(telethonTypes.PeerUser(user_id))
-        result = await client(functions.messages.CreateChatRequest(
+        result = await client(
+            functions.messages.CreateChatRequest(
             users=[*support_users, user_entity],
             title=chat_name
-        ))
-        
+            )
+        )
         chat_id = result.updates.updates[1].participants.chat_id
-        chat = await client.get_entity(telethonTypes.PeerChat(chat_id))   
-        chat_link = await client(functions.messages.ExportChatInviteRequest(
-            peer=chat
-        ))
-        
+        chat = await client.get_entity(telethonTypes.PeerChat(chat_id))
+        chat_link = await client(
+            functions.messages.ExportChatInviteRequest(
+                peer=chat
+            )
+        )
+
         await SupportChat.create(
             chat_id=chat_id,
             contract_type=contract_type,
@@ -177,9 +186,8 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
             link=chat_link.link,
             user_id=user_id
         )
-
         return chat_link.link
-    
+
     return get_chat.link
 
 
@@ -202,7 +210,7 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatTypeC
         chat_name = f"{user} запрос поддержки"
     elif callback_data.chat_type == "DiagEquip" and callback_data.key == "chat5":
         chat_name = f"{user} запрос на оборудование"
-    else:    
+    else:
         chat_name = f"{user} {support_chats_type[callback_data.key]} {chat[callback_data.key]}"
 
     link = await create_chat(callback.from_user.id, chat_name, chat[callback_data.key])
@@ -212,7 +220,7 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatTypeC
     else:
         msg = f"По вашему запросу {support_chats_type[callback_data.key]} " +\
             f"{chat[callback_data.key]} был создан чат, ссылка на чат {link}"
-    
+
     answer_message = await callback.message.answer(
         msg
     )

@@ -13,28 +13,33 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-async def show_message(data: BroadcastData, user_id: int) -> Message:
+async def show_message(data: BroadcastData, user_id: int) -> Message | None:
     if data.type == BroadcastData.TypeMessage.TEXT:
-        return await bot.send_message(chat_id=user_id,
-                                text=data.caption_text
+        return await bot.send_message(
+            chat_id=user_id,
+            text=data.caption_text
         )
     elif data.type == BroadcastData.TypeMessage.VIDEO:
-        return await bot.send_video(chat_id=user_id,
-                                video=data.file_id,
-                                caption=data.caption_text
+        return await bot.send_video(
+            chat_id=user_id,
+            video=data.file_id,
+            caption=data.caption_text
         )
     elif data.type == BroadcastData.TypeMessage.PHOTO:
-        return await bot.send_photo(chat_id=user_id,
-                                photo=data.file_id,
-                                caption=data.caption_text
+        return await bot.send_photo(
+            chat_id=user_id,
+            photo=data.file_id,
+            caption=data.caption_text
         )
+    else:
+        return None
 
 
 @router.message(Command("start"))
 async def start_bot(message: Message) -> None:
     try:
         user_name = ""
-        if message.from_user.username != None:
+        if message.from_user.username is not None:
             user_name = message.from_user.username
 
         await User.create(
@@ -44,7 +49,8 @@ async def start_bot(message: Message) -> None:
         )
 
         await message.answer(
-            "Добро пожаловать в бот поддержки\nДля выбора интересующего раздела нажмите кнопку «Меню»"
+            "Добро пожаловать в бот поддержки\n" +\
+            "Для выбора интересующего раздела нажмите кнопку «Меню»"
         )
     except IntegrityError:
         logger.info(f"User {message.from_user.id} already exist in database.")

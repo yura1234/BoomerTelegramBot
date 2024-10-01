@@ -11,7 +11,8 @@ from aiogram import Router
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
 from aiogram.fsm.context import FSMContext
-from aiogram.exceptions import *
+from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError,\
+                            TelegramNotFound, TelegramAPIError
 
 from loader import config, client, bot
 from bot.models.database import User, BroadcastData, BroadcastDataHistory
@@ -64,11 +65,12 @@ async def show_broadcast_menu(message: Message) -> None:
         builder.row(
             InlineKeyboardButton(
                 text="Создать новость",
-                callback_data=BroadcastMenuCallback(
-                    broad_type="Create").pack()),
+                callback_data=BroadcastMenuCallback(broad_type="Create").pack()
+            ),
             InlineKeyboardButton(
                 text="Показать прошлые новости",
-                callback_data=BroadcastMenuCallback(broad_type="Show").pack()),
+                callback_data=BroadcastMenuCallback(broad_type="Show").pack()
+            ),
             width=1
         )
 
@@ -98,12 +100,13 @@ async def show_broadcast_buttons(callback: CallbackQuery) -> None:
     broadcast_data = await BroadcastData.all().filter(
         created_date__gt = current_date - timedelta(days=2)
     )
-    
+
     for data in broadcast_data:
         buttons.append(
             InlineKeyboardButton(
                 text=f"{data.created_date.strftime("%d/%m/%Y %H:%M")}",
-                callback_data=BroadcastBtnCallback(id=data.id).pack())
+                callback_data=BroadcastBtnCallback(id=data.id).pack()
+            )
         )
 
     builder.row(*buttons, width=2)
@@ -152,7 +155,7 @@ async def delete_broadcast_message(
 ) -> None:
     picked_message = await BroadcastData.get_or_none(id=callback_data.id)
 
-    if picked_message == None:
+    if picked_message is None:
         await callback.message.answer(
             "Данная новость была удалена ранее!"
         )
@@ -161,7 +164,7 @@ async def delete_broadcast_message(
     diff_time = datetime.now(pytz.timezone("Europe/Moscow")) - picked_message.created_date
     if diff_time.days < 2:
         last_history_list = await BroadcastDataHistory.filter(broadcast_data_id=picked_message.id)
-        
+
         for data in last_history_list:
             try:
                 await bot.delete_message(
@@ -213,7 +216,7 @@ async def edit_broadcast_message(message: Message, state: FSMContext) -> None:
 
     find_message = await BroadcastData.get_or_none(id=int(message_id))
 
-    if find_message == None:
+    if find_message is None:
         await message.answer(
             "Данная новость была удалена ранее!"
         )
@@ -290,11 +293,11 @@ async def broadcaster(user_id: int, broadcast_data: BroadcastData) -> bool:
         logger.error(f"Target [ID:{user_id}]: Flood limit is exceeded. Sleep {e.retry_after} seconds.")
         await asyncio.sleep(e.retry_after)
         return await broadcaster(user_id, broadcast_data)
-    except TelegramForbiddenError as e:
+    except TelegramForbiddenError:
         logger.error(f"Target [ID:{user_id}]: blocked by user")
-    except TelegramNotFound as e:
+    except TelegramNotFound:
         logger.error(f"Target [ID:{user_id}]: invalid user ID")
-    except TelegramAPIError as e:
+    except TelegramAPIError:
         logger.exception(f"Target [ID:{user_id}]: failed")
     else:
         return True

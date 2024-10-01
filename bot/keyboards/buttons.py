@@ -7,9 +7,9 @@ from bot.models.callback import ChatTypeCallback
 def add_button_keys(
         builder: InlineKeyboardBuilder,
         chats: dict[str, str],
-        callback_type: str, 
-        chat_type: str, 
-        max_len: int, 
+        callback_type: str,
+        chat_type: str,
+        max_len: int,
         width: int
 ) -> None:
     chat_keys = list(chats.keys())
