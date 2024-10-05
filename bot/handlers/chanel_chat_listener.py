@@ -17,23 +17,17 @@ async def check_join_request(update: ChatJoinRequest) -> None:
     link = update.invite_link.invite_link.split("/")[-1]
     part_link = link[:link.index(".")]
 
-    for k,v in channel_links.items():
-        if part_link in v:
-            channel_type = channels[k]
-            break
-
-    get_access_channels = await AccesChannelUser.get_or_none(
+    approve_user_channels = await AccesChannelUser.filter(
         user_id=update.from_user.id,
-        product=channel_type
+        permission=True
     )
 
-    if get_access_channels:
-        if get_access_channels.permission:
-            await update.approve()
-            logger.info(f"User {update.from_user.id} approved to join channel {channel_type}")
-        else:
-            await update.decline()
-            logger.info(f"User {update.from_user.id} decline to join channel {channel_type}")
-    else:
-        await update.decline()
-        logger.warning(f"User {update.from_user.id} with channel {channel_type} not found in DB")
+    for k,v in channels.items():
+        for user_channel in approve_user_channels:
+            if v == user_channel.product and channel_links[k].split("/")[-1].startswith(part_link):
+                await update.approve()
+                logger.info(f"User {update.from_user.id} approved to join channel {user_channel.product}")
+                return
+
+    await update.decline()
+    logger.info(f"User {update.from_user.id} decline to join channel with part link {part_link}")
