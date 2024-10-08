@@ -162,7 +162,7 @@ async def save_sto(message: Message, state: FSMContext) -> None:
 @router.callback_query(AccesUserCallback.filter(F.permission == True))
 async def grant_permission(callback: CallbackQuery, callback_data: AccesUserCallback) -> None:
     get_perm = await AccesChannelUser.get_or_none(
-        user_id=callback_data.user_id, 
+        user_id=callback_data.user_id,
         product=channel_chats[callback_data.product],
         permission=False
     )

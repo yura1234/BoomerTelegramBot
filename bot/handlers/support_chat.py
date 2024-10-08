@@ -86,6 +86,8 @@ async def support_chat(message: Message) -> None:
 @router.callback_query(ChatTypeCallback.filter(F.con_type == "OnlySupportChats"))
 async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCallback) -> None:
     chat_type = ""
+    msg = ""
+
     if callback_data.chat_type == "OrderParts":
         chat = order_chats
     elif callback_data.chat_type == "Support":
@@ -95,6 +97,8 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
                 chat_type = "поддержка"
         else:
             chat = coding_services_chats
+            if support_chats_type[callback_data.key] == "поддержка":
+                chat_type = "поддержка"
     elif callback_data.chat_type == "DiagEquip":
         chat = diag_equip_chats
         chat_type = "оборудованию"
@@ -108,16 +112,16 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
     if chat_type == "":
         if support_chats_type[callback_data.key] == "продукт":
             chat_type = "продукту"
-        else:
+        elif support_chats_type[callback_data.key] == "услуга":
             chat_type = "услуге"
     elif chat_type == "поддержка":
-        msg = "Для получения более подробной информаци " +\
-            "или услуге Вы можете отправить сообщение на " +\
-            "запрос в чате ниже или на почту support@bimmer-online.ru"
+        msg = "Вы можете отправить сообщение на запрос в чате ниже или на" +\
+        " почту support@bimmer-online.ru"
 
-    msg = f"Для получения более подробной информации по {chat_type} " +\
-        f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
-        "запрос в чате ниже или на почту support@bimmer-online.ru"
+    if msg == "":
+        msg = f"Для получения более подробной информации по {chat_type} " +\
+            f"\"{chat[callback_data.key]}\" Вы можете отправить сообщение на " +\
+            "запрос в чате ниже или на почту support@bimmer-online.ru"
 
     builder = InlineKeyboardBuilder()
     callback_data.con_type = "CreateChat"
