@@ -137,7 +137,8 @@ async def save_sto(message: Message, state: FSMContext) -> None:
             callback_data=AccesUserCallback(
                 user_id=message.from_user.id,
                 product=key_chan_list[position],
-                permission=True
+                permission=True,
+                write_com=False
             ).pack()
         ),
         InlineKeyboardButton(
@@ -145,7 +146,8 @@ async def save_sto(message: Message, state: FSMContext) -> None:
             callback_data=AccesUserCallback(
                 user_id=message.from_user.id,
                 product=key_chan_list[position],
-                permission=False
+                permission=False,
+                write_com=False
             ).pack()
         ),
     )
@@ -188,14 +190,15 @@ async def grant_permission(callback: CallbackQuery, callback_data: AccesUserCall
     )
 
 
-@router.callback_query(AccesUserCallback.filter(F.permission == False))
+@router.callback_query(AccesUserCallback.filter(F.permission == False and F.write_com == False))
 async def decline_permission(
     callback: CallbackQuery,
     callback_data: AccesUserCallback,
     state: FSMContext
 ) -> None:
-    msg = f"Ваш запрос для подключения к чату по программе {channel_chats[callback_data.product]} отклонен!" +\
-        " О причинах отказа ожидайте ответа от модератора."
+    msg = "К сожалению, мы не нашли у Вашей СТО активной подписки на данную программу. " +\
+        "Для приобретения доступа просим написать запрос на почту support@bimmer-online.ru " +\
+        "или в чат поддержки @bimmeronline"
 
     await callback.message.answer("Отклонен")
     await bot.send_message(
@@ -203,6 +206,30 @@ async def decline_permission(
         text=msg
     )
 
+    callback_data_btn = callback_data.model_copy()
+    callback_data_btn.write_com = True
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="Указать причину",
+            callback_data=callback_data_btn.pack()
+        )
+    )
+
+    await bot.send_message(
+        chat_id=callback.from_user.id,
+        text="Вы можете указать причину отказа нажав кнопку ниже",
+        reply_markup=builder.as_markup()
+    )
+
+
+@router.callback_query(AccesUserCallback.filter(F.write_com == True))
+async def write_decline_comment(
+    callback: CallbackQuery,
+    callback_data: AccesUserCallback,
+    state: FSMContext
+) -> None:
     await callback.message.answer("Введите причину отказа:")
     await state.update_data(user_id=callback_data.user_id)
     await state.update_data(product=channel_chats[callback_data.product])

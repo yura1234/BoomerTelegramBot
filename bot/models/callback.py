@@ -11,6 +11,7 @@ class AccesUserCallback(CallbackData, prefix="acc"):
     user_id: int
     product: str
     permission: bool
+    write_com: bool
 
 
 class BroadcastMenuCallback(CallbackData, prefix="brd"):
