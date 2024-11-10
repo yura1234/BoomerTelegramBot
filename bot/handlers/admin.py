@@ -147,6 +147,11 @@ async def show_broadcast_message(
         width=2
     )
 
+    await callback.message.answer(
+        "Выбранное новостное сообщение:",
+        reply_markup=builder.as_markup()
+    )
+
 
 @router.callback_query(BroadcastMenuCallback.filter(F.broad_type == "Delete"))
 async def delete_broadcast_message(
@@ -171,14 +176,13 @@ async def delete_broadcast_message(
                     chat_id=data.user_id,
                     message_id=data.message_id
                 )
-
-                await callback.message.answer(
-                    "Новость успешно удалена!"
-                )
             except Exception as ex:
                 logger.warning(ex)
             await asyncio.sleep(.05)
 
+        await callback.message.answer(
+            "Новость успешно удалена!"
+        )
         await picked_message.delete()
     else:
         await callback.message.answer(

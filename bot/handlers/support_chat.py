@@ -13,7 +13,7 @@ from tortoise import timezone
 
 from loader import config, client, bot
 from bot.models.callback import ChatTypeCallback
-from bot.models.database import SupportChat, LastUserMessage
+from bot.models.database import SupportChat, LastUserMessage, User
 
 
 router = Router()
@@ -33,15 +33,6 @@ diag_equip_chats = config["diagEquipment"]
 equip_photos = config["diagEquipment.PhotoPath"]
 
 path_photos = os.path.join(os.getcwd(), "photos", "")
-
-
-def get_user_title(user_data: TgUser) -> str | int:
-    if user_data.username:
-        return user_data.username
-    elif user_data.full_name:
-        return user_data.full_name
-    else:
-        return user_data.id
 
 
 async def erase_message(user_id: int, message_id: int) -> None:
@@ -64,17 +55,36 @@ async def erase_message(user_id: int, message_id: int) -> None:
         await last_message.save()
 
 
+async def username_exist(user: TgUser) -> bool:
+    if user.username is None:
+        return False
+
+    await User.update_or_create(
+        user_id=user.id,
+        defaults={
+            "username":user.username if user.username is not None else "",
+            "fullname":user.full_name,
+        }
+    )
+    return True
+
+
 @router.message(Command("support"))
 async def support_chat(message: Message) -> None:
+    check_username = await username_exist(message.from_user)
+    if not check_username:
+        await message.answer(
+            "Для создания чата поддержки необходимо указать имя пользователя в настройках вашего" +\
+                " телеграм аккаунта!"
+        )
+        return
+
     msg = "Для получения более подробной информаци " +\
         "или услуге Вы можете отправить сообщение на " +\
         "запрос в чате ниже или на почту support@bimmer-online.ru"
 
-    user = get_user_title(message.from_user)
-
-    chat_name = f"{user} запрос поддержки"
-
-    link = await create_chat(message.from_user.id, chat_name, "support_chat")
+    chat_name = f"{message.from_user.username} запрос поддержки"
+    link = await create_chat(message.from_user, chat_name, "support_chat")
 
     msg = f"По вашему запросу поддержки был создан чат, ссылка на чат {link}"
     await message.answer(
@@ -148,10 +158,10 @@ async def only_support_chats(callback: CallbackQuery, callback_data: ChatTypeCal
     await erase_message(callback.from_user.id, answer_message.message_id)
 
 
-async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
+async def create_chat(user: TgUser, chat_name: str, contract_type: str) -> str:
     get_chat = await SupportChat.get_or_none(
         contract_type=contract_type,
-        user_id=user_id
+        user_id=user.id
     )
 
     if get_chat:
@@ -167,11 +177,9 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
             get_chat = None
 
     if get_chat is None:
-        user_entity = await client.get_entity(telethonTypes.PeerUser(user_id))
-        # user_entity = await client.get_input_entity(telethonTypes.PeerUser(user_id))
         result = await client(
             functions.messages.CreateChatRequest(
-            users=[*support_users, user_entity],
+            users=(*support_users, user.username),
             title=chat_name
             )
         )
@@ -188,7 +196,7 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
             contract_type=contract_type,
             chat_name=chat_name,
             link=chat_link.link,
-            user_id=user_id
+            user_id=user.id
         )
         return chat_link.link
 
@@ -197,6 +205,14 @@ async def create_chat(user_id: int, chat_name: str, contract_type: str) -> str:
 
 @router.callback_query(ChatTypeCallback.filter(F.con_type == "CreateChat"))
 async def create_support_chats(callback: CallbackQuery, callback_data: ChatTypeCallback) -> None:
+    check_username = await username_exist(callback.from_user)
+    if not check_username:
+        await callback.message.answer(
+            "Для создания чата по выбранной программе необходимо указать имя пользователя " +\
+                "в настройках вашего телеграм аккаунта!"
+        )
+        return
+
     if callback_data.chat_type == "Support":
         if callback_data.key in support_chats.keys():
             chat = support_chats
@@ -209,15 +225,15 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatTypeC
     else:
         chat = diag_equip_chats
 
-    user = get_user_title(callback.from_user)
     if support_chats_type[callback_data.key] == "поддержка":
-        chat_name = f"{user} запрос поддержки"
+        chat_name = f"{callback.from_user.username} запрос поддержки"
     elif callback_data.chat_type == "DiagEquip" and callback_data.key == "chat5":
-        chat_name = f"{user} запрос на оборудование"
+        chat_name = f"{callback.from_user.username} запрос на оборудование"
     else:
-        chat_name = f"{user} {support_chats_type[callback_data.key]} {chat[callback_data.key]}"
+        chat_name = f"{callback.from_user.username} {support_chats_type[callback_data.key]}" +\
+            f" {chat[callback_data.key]}"
 
-    link = await create_chat(callback.from_user.id, chat_name, chat[callback_data.key])
+    link = await create_chat(callback.from_user, chat_name, chat[callback_data.key])
 
     if support_chats_type[callback_data.key] == "поддержка":
         msg = f"По вашему запросу поддержки был создан чат, ссылка на чат {link}"
