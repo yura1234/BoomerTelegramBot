@@ -74,8 +74,7 @@ async def support_chat(message: Message) -> None:
     check_username = await username_exist(message.from_user)
     if not check_username:
         await message.answer(
-            "Для создания чата поддержки необходимо указать имя пользователя в настройках вашего" +\
-                " телеграм аккаунта!"
+            "Напишите в адрес нашей поддержки @BimmerOnline"
         )
         return
 
@@ -208,8 +207,7 @@ async def create_support_chats(callback: CallbackQuery, callback_data: ChatTypeC
     check_username = await username_exist(callback.from_user)
     if not check_username:
         await callback.message.answer(
-            "Для создания чата по выбранной программе необходимо указать имя пользователя " +\
-                "в настройках вашего телеграм аккаунта!"
+            "Напишите в адрес нашей поддержки @BimmerOnline"
         )
         return
 
