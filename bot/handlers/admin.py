@@ -228,15 +228,15 @@ async def edit_broadcast_message(message: Message, state: FSMContext) -> None:
 
     if message.text:
         msg_type = BroadcastData.TypeMessage.TEXT
-        text = message.text
+        text = message.html_text
         file_id = ""
     elif message.video:
         msg_type = BroadcastData.TypeMessage.VIDEO
-        text = message.caption
+        text = message.html_text
         file_id = message.video.file_id
     elif message.photo:
         msg_type = BroadcastData.TypeMessage.PHOTO
-        text = message.caption
+        text = message.html_text
         file_id = message.photo[0].file_id
 
     if find_message.type != msg_type:
@@ -315,15 +315,15 @@ async def get_broadcast_message(message: Message, state: FSMContext) -> None:
 
     if message.text:
         msg_type = BroadcastData.TypeMessage.TEXT
-        text = message.text
+        text = message.html_text
         file_id = ""
     elif message.video:
         msg_type = BroadcastData.TypeMessage.VIDEO
-        text = message.caption
+        text = message.html_text
         file_id = message.video.file_id
     elif message.photo:
         msg_type = BroadcastData.TypeMessage.PHOTO
-        text = message.caption
+        text = message.html_text
         file_id = message.photo[0].file_id
 
     broadcast_data = await BroadcastData.create(

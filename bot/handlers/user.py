@@ -3,6 +3,7 @@ import logging
 from aiogram import Router
 from aiogram.filters.command import Command
 from aiogram.types import Message
+from aiogram.enums.parse_mode import ParseMode
 from tortoise.exceptions import IntegrityError
 
 from loader import bot
@@ -17,19 +18,22 @@ async def show_message(data: BroadcastData, user_id: int) -> Message | None:
     if data.type == BroadcastData.TypeMessage.TEXT:
         return await bot.send_message(
             chat_id=user_id,
-            text=data.caption_text
+            text=data.caption_text,
+            parse_mode=ParseMode.HTML
         )
     elif data.type == BroadcastData.TypeMessage.VIDEO:
         return await bot.send_video(
             chat_id=user_id,
             video=data.file_id,
-            caption=data.caption_text
+            caption=data.caption_text,
+            parse_mode=ParseMode.HTML
         )
     elif data.type == BroadcastData.TypeMessage.PHOTO:
         return await bot.send_photo(
             chat_id=user_id,
             photo=data.file_id,
-            caption=data.caption_text
+            caption=data.caption_text,
+            parse_mode=ParseMode.HTML
         )
     else:
         return None
