@@ -16,3 +16,11 @@ class ModeratorChannelState(StatesGroup):
 class BroadcastState(StatesGroup):
     distrib_message = State()
     edit_message = State()
+
+
+class CalendarState(StatesGroup):
+    main = State()
+
+
+class TimeState(StatesGroup):
+    time = State()

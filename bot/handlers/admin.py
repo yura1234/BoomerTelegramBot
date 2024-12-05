@@ -2,6 +2,7 @@ import logging
 import os
 import asyncio
 from datetime import datetime, timedelta
+# from tortoise import timezone
 import pytz
 from telethon import functions
 from aiogram.filters.command import Command
@@ -13,16 +14,37 @@ from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError,\
                             TelegramNotFound, TelegramAPIError
+from aiogram_dialog import setup_dialogs
 
 from loader import config, client, bot
 from bot.models.database import User, BroadcastData, BroadcastDataHistory
 from bot.models.callback import BroadcastMenuCallback, BroadcastBtnCallback
 from bot.models.state import BroadcastState
 from bot.handlers.user import show_message
+from .schedule_broadcast import task_sceduled_data, dialog
+from .schedule_broadcast import router as schedule_router
 
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+router.include_router(dialog)
+router.include_router(schedule_router)
+setup_dialogs(router)
+
+
+async def broadcast_for_all(data: BroadcastData) -> None:
+    all_users = await User.all()
+    # logger.info(f"Start broadcast message for {len(all_users)} users.")
+    logger.info("Start broadcast data with id %d for %d users.", data.id, len(all_users))
+    count = 0
+    try:
+        for user in all_users:
+            if await broadcaster(user.user_id, data):
+                count += 1
+            await asyncio.sleep(.05)
+    finally:
+        logger.info("%d messages successful sent.", count)
 
 
 async def check_if_user_admin(user_id: int) -> bool:
@@ -71,9 +93,16 @@ async def show_broadcast_menu(message: Message) -> None:
                 text="Показать прошлые новости",
                 callback_data=BroadcastMenuCallback(broad_type="Show").pack()
             ),
+            InlineKeyboardButton(
+                text="Создать отложенную новость",
+                callback_data=BroadcastMenuCallback(broad_type="Schedule").pack()
+            ),
+            InlineKeyboardButton(
+                text="Показать отложенные новость",
+                callback_data=BroadcastMenuCallback(broad_type="Show", schedule=True).pack()
+            ),
             width=1
         )
-
         await message.answer(
             "Выберете команду для создания новости:",
             reply_markup=builder.as_markup()
@@ -93,19 +122,28 @@ async def create_broadcast_message(callback: CallbackQuery, state: FSMContext) -
 
 
 @router.callback_query(BroadcastMenuCallback.filter(F.broad_type == "Show"))
-async def show_broadcast_buttons(callback: CallbackQuery) -> None:
+async def show_broadcast_buttons(
+    callback: CallbackQuery,
+    callback_data: BroadcastMenuCallback
+) -> None:
     builder = InlineKeyboardBuilder()
     buttons = []
-    current_date = datetime.now(pytz.timezone("Europe/Moscow"))
-    broadcast_data = await BroadcastData.all().filter(
-        created_date__gt = current_date - timedelta(days=2)
-    )
+
+    if callback_data.schedule:
+        broadcast_data = await BroadcastData.filter(is_sheduled=True)
+    else:
+        current_date = datetime.now(pytz.timezone("Europe/Moscow"))
+        broadcast_data = await BroadcastData.all().filter(
+            created_date__gt = current_date - timedelta(days=2)
+        )
 
     for data in broadcast_data:
         buttons.append(
             InlineKeyboardButton(
                 text=f"{data.created_date.strftime("%d/%m/%Y %H:%M")}",
-                callback_data=BroadcastBtnCallback(id=data.id).pack()
+                callback_data=BroadcastBtnCallback(
+                    id=data.id,
+                    schedule=bool(data.is_sheduled)).pack()
             )
         )
 
@@ -125,10 +163,11 @@ async def show_broadcast_message(
     builder = InlineKeyboardBuilder()
     get_message = await BroadcastData.filter(id=callback_data.id).first()
 
-    find_admin_user = await client(functions.users.GetFullUserRequest(
-        id=list(config["Admin"].values())[0]
-    ))
-
+    find_admin_user = await client(
+        functions.users.GetFullUserRequest(
+            id=list(config["Admin"].values())[0]
+        )
+    )
     await show_message(get_message, find_admin_user.full_user.id)
 
     builder.row(
@@ -138,6 +177,23 @@ async def show_broadcast_message(
                 broad_type="Edit",
                 id=callback_data.id).pack()
         ),
+    )
+    if callback_data.schedule:
+        builder.row(
+            InlineKeyboardButton(
+                text="Редактировать дату",
+                callback_data=BroadcastMenuCallback(
+                    broad_type="Edit date",
+                    id=callback_data.id).pack()
+            ),
+            InlineKeyboardButton(
+                text="Редактировать время",
+                callback_data=BroadcastMenuCallback(
+                    broad_type="Edit time",
+                    id=callback_data.id).pack()
+            )
+        )
+    builder.row(
         InlineKeyboardButton(
             text="Удалить",
             callback_data=BroadcastMenuCallback(
@@ -201,7 +257,7 @@ async def edit_broadcast(
     diff_time = datetime.now(pytz.timezone("Europe/Moscow")) - picked_message.created_date
     if diff_time.days < 2:
         await callback.message.answer(
-            "Введите сообщение для рекдактирования выбранного:"
+            "Введите сообщение для редактирования выбранного:"
         )
 
         await state.update_data(id=callback_data.id)
@@ -311,6 +367,12 @@ async def broadcaster(user_id: int, broadcast_data: BroadcastData) -> bool:
 
 @router.message(BroadcastState.distrib_message)
 async def get_broadcast_message(message: Message, state: FSMContext) -> None:
+    schedule_data = await state.get_data()
+    if schedule_data:
+        datetime_parts = [
+            *schedule_data.get("schedule_date").split("-")[::-1],
+            *schedule_data.get("schedule_time").split(" ")
+        ]
     await state.clear()
 
     if message.text:
@@ -325,20 +387,33 @@ async def get_broadcast_message(message: Message, state: FSMContext) -> None:
         msg_type = BroadcastData.TypeMessage.PHOTO
         text = message.html_text
         file_id = message.photo[0].file_id
+    else:
+        await message.answer(
+            "Выбран тип сообщения, который не поддерживается\n" +\
+            "Список доступных: Текст, Фото, Видео"
+        )
+        return
 
-    broadcast_data = await BroadcastData.create(
-        type=msg_type,
-        caption_text=text,
-        file_id=file_id
-    )
+    if schedule_data:
+        broadcast_data = await BroadcastData.create(
+            type=msg_type,
+            caption_text=text,
+            file_id=file_id,
+            is_sheduled=True
+        )
+        broadcast_data.created_date = broadcast_data.created_date\
+            .replace(*list(map(int, datetime_parts)), 0)
+        await broadcast_data.save()
 
-    all_users = await User.all()
-    logger.info(f"Start broadcast message for {len(all_users)} users.")
-    count = 0
-    try:
-        for user in all_users:
-            if await broadcaster(user.user_id, broadcast_data):
-                count += 1
-            await asyncio.sleep(.05)
-    finally:
-        logger.info(f"{count} messages successful sent.")
+        await message.answer(
+            "Отложенная новость создана."
+        )
+        asyncio.create_task(task_sceduled_data(broadcast_data))
+    else:
+        broadcast_data = await BroadcastData.create(
+            type=msg_type,
+            caption_text=text,
+            file_id=file_id,
+            is_sheduled=False
+        )
+        await broadcast_for_all(broadcast_data)

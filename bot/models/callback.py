@@ -17,7 +17,13 @@ class AccesUserCallback(CallbackData, prefix="acc"):
 class BroadcastMenuCallback(CallbackData, prefix="brd"):
     broad_type: str
     id: int = -1
+    schedule: bool = False
 
 
 class BroadcastBtnCallback(CallbackData, prefix="brdbtn"):
     id: int
+    schedule: bool = False
+
+
+class DateTimeCallback(CallbackData, prefix="dtc"):
+    schedule_date: str

@@ -8,7 +8,7 @@ from loader import client, tortoise_orm_config, dp, bot
 
 from bot.handlers import user, admin, menu,\
                  support_chat, channel_chat,\
-                 chanel_chat_listener
+                 chanel_chat_listener, schedule_broadcast
 
 
 async def on_startup() -> None:
@@ -45,7 +45,10 @@ async def main() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    await dp.start_polling(bot)
+    await asyncio.gather(
+        dp.start_polling(bot),
+        schedule_broadcast.load_scheduled_broadcast_data()
+    )
 
 
 if __name__ == "__main__":

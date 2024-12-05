@@ -52,6 +52,7 @@ class BroadcastData(Model):
     file_id = fields.TextField()
     created_date = fields.DatetimeField(auto_now_add=True)
     updated_date = fields.DatetimeField(auto_now=True)
+    is_sheduled = fields.BooleanField(null=True)
 
     class Meta:
         table = "broadcast_data"
