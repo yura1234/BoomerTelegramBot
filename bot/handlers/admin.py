@@ -21,7 +21,7 @@ from bot.models.database import User, BroadcastData, BroadcastDataHistory
 from bot.models.callback import BroadcastMenuCallback, BroadcastBtnCallback
 from bot.models.state import BroadcastState
 from bot.handlers.user import show_message
-from .schedule_broadcast import task_sceduled_data, dialog
+from .schedule_broadcast import task_sceduled_data, remake_schedule_task, dialog
 from .schedule_broadcast import router as schedule_router
 
 
@@ -44,7 +44,7 @@ async def broadcast_for_all(data: BroadcastData) -> None:
                 count += 1
             await asyncio.sleep(.05)
     finally:
-        logger.info("%d messages successful sent.", count)
+        logger.info("%d messages successful sent for broadcast with id %d", count, data.id)
 
 
 async def check_if_user_admin(user_id: int) -> bool:
@@ -128,9 +128,11 @@ async def show_broadcast_buttons(
 ) -> None:
     builder = InlineKeyboardBuilder()
     buttons = []
+    msg = "Новости за последние 48 часов"
 
     if callback_data.schedule:
         broadcast_data = await BroadcastData.filter(is_sheduled=True)
+        msg = "Отложенные новости"
     else:
         current_date = datetime.now(pytz.timezone("Europe/Moscow"))
         broadcast_data = await BroadcastData.all().filter(
@@ -150,7 +152,7 @@ async def show_broadcast_buttons(
     builder.row(*buttons, width=2)
 
     await callback.message.answer(
-        "Новости за последние 48 часов",
+        msg,
         reply_markup=builder.as_markup()
     )
 
@@ -307,6 +309,10 @@ async def edit_broadcast_message(message: Message, state: FSMContext) -> None:
     find_message.file_id = file_id
     await find_message.save()
 
+    if find_message.is_sheduled:
+        asyncio.create_task(remake_schedule_task(find_message))
+        return
+
     last_history_list = await BroadcastDataHistory.filter(broadcast_data_id=find_message.id)
 
     for data in last_history_list:
@@ -408,7 +414,10 @@ async def get_broadcast_message(message: Message, state: FSMContext) -> None:
         await message.answer(
             "Отложенная новость создана."
         )
-        asyncio.create_task(task_sceduled_data(broadcast_data))
+        asyncio.create_task(
+            coro=task_sceduled_data(broadcast_data),
+            name=f"{broadcast_data.id} schedule task"
+        )
     else:
         broadcast_data = await BroadcastData.create(
             type=msg_type,

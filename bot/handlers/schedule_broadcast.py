@@ -30,7 +30,10 @@ async def on_date_selected(
     selected_date: date,
 ) -> None:
     if manager.start_data:
-        broadcast = await BroadcastData.filter(id=manager.start_data["id"]).first()
+        broadcast = await BroadcastData.filter(
+            id=manager.start_data["id"],
+            is_sheduled=True
+        ).first()
         if broadcast:
             broadcast.created_date = broadcast.created_date.replace(
                 day=selected_date.day,
@@ -42,8 +45,8 @@ async def on_date_selected(
                 "Дата у отложенного сообщения была изменена на "
                 f"{selected_date.strftime("%d.%m.%Y")}"
             )
+            asyncio.create_task(remake_schedule_task(broadcast))
         await manager.reset_stack()
-        asyncio.create_task(remake_schedule_task(broadcast))
         return
 
     await manager.reset_stack()
@@ -145,14 +148,14 @@ async def get_schedule_time(message: Message, state: FSMContext) -> None:
 
     await state.update_data(schedule_time=message.text)
     await message.answer(
-        "Выберете отложенное сообщение для массовой рассылки пользователям:"
+        "Введите отложенное сообщение для массовой рассылки пользователям:"
     )
     await state.set_state(BroadcastState.distrib_message)
 
 
-async def task_sceduled_data(data: BroadcastData, offset_time: int = None) -> None:
+async def task_sceduled_data(data: BroadcastData, offset_time: int = 0) -> None:
     from .admin import broadcast_for_all
-    current_datetime = datetime.now(pytz.timezone("Europe/Moscow"))
+    current_datetime = datetime.now(pytz.timezone("Europe/Moscow")).replace(second=0)
 
     if data.created_date < current_datetime:
         task_time = current_datetime + timedelta(minutes=offset_time)
@@ -168,7 +171,6 @@ async def task_sceduled_data(data: BroadcastData, offset_time: int = None) -> No
     try:
         await asyncio.sleep(seconds_to_start)
     except asyncio.CancelledError:
-        logger.info("Cancel task with id %s", data.id)
         return
 
     await broadcast_for_all(data)
@@ -182,7 +184,14 @@ async def remake_schedule_task(data: BroadcastData) -> None:
     for task in asyncio.all_tasks():
         if re.match(task_pattern, task.get_name()):
             task.cancel()
-            await task_sceduled_data(data)
+            await task
+            if task.done():
+                logger.info("Cancel task with id %s", data.id)
+
+            asyncio.create_task(
+                coro=task_sceduled_data(data),
+                name=f"{data.id} schedule task"
+            )
             break
 
 
