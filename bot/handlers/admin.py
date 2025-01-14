@@ -15,6 +15,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError,\
                             TelegramNotFound, TelegramAPIError
 from aiogram_dialog import setup_dialogs
+from aiogram.enums.parse_mode import ParseMode
 
 from loader import config, client, bot
 from bot.models.database import User, BroadcastData, BroadcastDataHistory
@@ -321,13 +322,15 @@ async def edit_broadcast_message(message: Message, state: FSMContext) -> None:
                 await bot.edit_message_text(
                     text=find_message.caption_text,
                     chat_id=data.user_id,
-                    message_id=data.message_id
+                    message_id=data.message_id,
+                    parse_mode=ParseMode.HTML
                 )
             elif message.photo:
                 await bot.edit_message_media(
                     media=input_media_photo.InputMediaPhoto(
                         media=find_message.file_id,
-                        caption=find_message.caption_text
+                        text=find_message.caption_text,
+                        parse_mode=ParseMode.HTML
                     ),
                     chat_id=data.user_id,
                     message_id=data.message_id
@@ -336,7 +339,8 @@ async def edit_broadcast_message(message: Message, state: FSMContext) -> None:
                 await bot.edit_message_media(
                     media=input_media_video.InputMediaVideo(
                         media=find_message.file_id,
-                        caption=find_message.caption_text
+                        caption=find_message.caption_text,
+                        parse_mode=ParseMode.HTML
                     ),
                     chat_id=data.user_id,
                     message_id=data.message_id
