@@ -329,7 +329,7 @@ async def edit_broadcast_message(message: Message, state: FSMContext) -> None:
                 await bot.edit_message_media(
                     media=input_media_photo.InputMediaPhoto(
                         media=find_message.file_id,
-                        text=find_message.caption_text,
+                        caption=find_message.caption_text,
                         parse_mode=ParseMode.HTML
                     ),
                     chat_id=data.user_id,
