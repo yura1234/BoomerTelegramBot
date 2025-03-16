@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from telethon import functions
+from aiogram.enums.parse_mode import ParseMode
 
 from loader import config, client, bot
 from bot.models.callback import ChatTypeCallback, AccesUserCallback
@@ -107,7 +108,7 @@ async def save_sto(message: Message, state: FSMContext) -> None:
         else:
             user_title = get_user.user_id
 
-    msg = f"Пользователь {user_title} запрашивает доступ к каналу " +\
+    msg = f"<a href='tg://user?id={get_user.user_id}'>{user_title}</a> " +\
         f"{product} по указанным данным (emal\название СТО)\n" +\
         f"{email}\n{sto_name}"
 
@@ -152,12 +153,13 @@ async def save_sto(message: Message, state: FSMContext) -> None:
         ),
     )
 
-    await message.answer("Ожидайте ответа модератора.") 
+    await message.answer("Ожидайте ответа модератора.")
 
     await bot.send_message(
         chat_id=moderator_id,
         text=msg,
-        reply_markup=builder.as_markup()
+        reply_markup=builder.as_markup(),
+        parse_mode=ParseMode.HTML
     )
 
 
